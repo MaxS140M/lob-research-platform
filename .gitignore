@@ -66,3 +66,27 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# ---- Project-specific ----
+# Build output
+build/
+build-*/
+cmake-build-*/
+compile_commands.json
+
+# Market data (multi-GB, never committed)
+data/*
+!data/README.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Editors
+.vscode/
+.idea/

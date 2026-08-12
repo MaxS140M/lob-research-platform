@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lobpy"
+version = "0.1.0"
+description = "Python research layer for the lob C++ order book engine: backtester, features and models."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Max Sloam" }]
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.1",
+]
+
+[project.optional-dependencies]
+ml = ["scikit-learn>=1.4", "lightgbm>=4.3"]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+where = ["python"]
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]
