@@ -9,15 +9,23 @@ A small version of the research stack a trading firm runs internally. A fast C++
 replays a full day of NASDAQ TotalView-ITCH 5.0 data and rebuilds the order book. A Python
 layer drives that engine to backtest an ML short-horizon price signal.
 
-> **Status:** early development. The project skeleton, build and CI are in place; components
-> are being added phase by phase (see [Roadmap](#roadmap)).
+> **Status:** in development. The ITCH 5.0 parser is complete; the remaining components are
+> being added phase by phase (see [Roadmap](#roadmap)).
+
+## Highlights
+
+- **ITCH 5.0 parser:** parses a full NASDAQ BX day (28.7M messages, 837 MB) in **0.18 s
+  with full field decoding**, which is 6.3 ns and about 160M messages per second. The file
+  is memory-mapped and read without copying. Callbacks are resolved at compile time, so
+  there are no virtual calls and nothing is allocated per message. See
+  [docs/benchmarks.md](docs/benchmarks.md).
 
 ## Roadmap
 
 | Phase | Component                                             | Status      |
 | ----- | ----------------------------------------------------- | ----------- |
 | 0     | Project skeleton, CMake build, test harness, CI       | Done        |
-| 1     | ITCH 5.0 binary parser                                | Planned     |
+| 1     | ITCH 5.0 binary parser                                | Done        |
 | 2     | Limit order book and matching engine, with benchmarks | Planned     |
 | 3     | pybind11 Python bindings                              | Planned     |
 | 4     | Event-driven backtester with realistic costs          | Planned     |
@@ -49,6 +57,35 @@ recommended.
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build --output-on-failure
+```
+
+On WSL2, keep the build directory on the Linux filesystem (for example
+`cmake -S . -B ~/build/lob ...`) if the source tree is under `/mnt/c`. Building there is faster
+and avoids Windows file locks during dependency extraction.
+
+## Usage
+
+Parse a full ITCH 5.0 file and print per-type message counts, timestamp and session sanity
+checks, and parse throughput:
+
+```bash
+./build/itch_stats data/20190730.BX_ITCH_50
+```
+
+From C++, implement only the callbacks you need. Dispatch is resolved at compile time:
+
+```cpp
+#include "lob/itch_parser.hpp"
+#include "lob/mapped_file.hpp"
+
+struct MyHandler {
+    void on_add_order(const lob::itch::AddOrder& m) { /* ... */ }
+    void on_order_delete(const lob::itch::OrderDelete& m) { /* ... */ }
+};
+
+lob::MappedFile file("data/20190730.BX_ITCH_50");
+MyHandler handler;
+auto result = lob::itch::parse(file.bytes(), handler);
 ```
 
 ## Python package
