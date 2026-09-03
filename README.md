@@ -9,8 +9,8 @@ A small version of the research stack a trading firm runs internally. A fast C++
 replays a full day of NASDAQ TotalView-ITCH 5.0 data and rebuilds the order book. A Python
 layer drives that engine to backtest an ML short-horizon price signal.
 
-> **Status:** in development. The ITCH 5.0 parser is complete; the remaining components are
-> being added phase by phase (see [Roadmap](#roadmap)).
+> **Status:** in development. The ITCH 5.0 parser is complete; the order book, Python bindings,
+> backtester and ML signal are in progress. See [CHANGELOG.md](CHANGELOG.md) for releases.
 
 ## Highlights
 
@@ -19,18 +19,6 @@ layer drives that engine to backtest an ML short-horizon price signal.
   is memory-mapped and read without copying. Callbacks are resolved at compile time, so
   there are no virtual calls and nothing is allocated per message. See
   [docs/benchmarks.md](docs/benchmarks.md).
-
-## Roadmap
-
-| Phase | Component                                             | Status      |
-| ----- | ----------------------------------------------------- | ----------- |
-| 0     | Project skeleton, CMake build, test harness, CI       | Done        |
-| 1     | ITCH 5.0 binary parser                                | Done        |
-| 2     | Limit order book and matching engine, with benchmarks | Planned     |
-| 3     | pybind11 Python bindings                              | Planned     |
-| 4     | Event-driven backtester with realistic costs          | Planned     |
-| 5     | Order book features and ML price-move model           | Planned     |
-| 6     | Results write-up                                      | Planned     |
 
 ## Repository layout
 
