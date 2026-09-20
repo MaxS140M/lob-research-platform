@@ -17,6 +17,7 @@ set(LOB_WARNINGS -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversio
 
 # ---- Core library ----------------------------------------------------------
 add_library(lob
+  cpp/src/book_builder.cpp
   cpp/src/mapped_file.cpp
   cpp/src/order_book.cpp
 )
@@ -28,6 +29,10 @@ if(LOB_BUILD_TOOLS)
   add_executable(itch_stats cpp/tools/itch_stats.cpp)
   target_link_libraries(itch_stats PRIVATE lob)
   target_compile_options(itch_stats PRIVATE ${LOB_WARNINGS})
+
+  add_executable(book_replay cpp/tools/book_replay.cpp)
+  target_link_libraries(book_replay PRIVATE lob)
+  target_compile_options(book_replay PRIVATE ${LOB_WARNINGS})
 endif()
 
 # ---- Tests -----------------------------------------------------------------
@@ -43,6 +48,7 @@ if(LOB_BUILD_TESTS)
 
   enable_testing()
   add_executable(lob_tests
+    cpp/tests/test_book_builder.cpp
     cpp/tests/test_itch_parser.cpp
     cpp/tests/test_mapped_file.cpp
     cpp/tests/test_order_book.cpp
