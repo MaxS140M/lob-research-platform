@@ -12,6 +12,12 @@ endif()
 
 option(LOB_BUILD_TESTS "Build the GoogleTest unit tests" ON)
 option(LOB_BUILD_TOOLS "Build the command-line tools" ON)
+option(LOB_BUILD_BENCHMARKS "Build the Google Benchmark suite" ON)
+option(LOB_NATIVE "Optimise for the build machine's CPU (-march=native); use for benchmarks" OFF)
+
+if(LOB_NATIVE)
+  add_compile_options(-march=native)
+endif()
 
 set(LOB_WARNINGS -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion)
 
@@ -35,9 +41,27 @@ if(LOB_BUILD_TOOLS)
   target_compile_options(book_replay PRIVATE ${LOB_WARNINGS})
 endif()
 
+include(FetchContent)
+
+# ---- Benchmarks ------------------------------------------------------------
+if(LOB_BUILD_BENCHMARKS)
+  FetchContent_Declare(benchmark
+    URL https://github.com/google/benchmark/archive/refs/tags/v1.8.3.zip
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    SYSTEM
+  )
+  set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+  set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "" FORCE)
+  set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+  FetchContent_MakeAvailable(benchmark)
+
+  add_executable(lob_bench cpp/bench/bench_book.cpp)
+  target_link_libraries(lob_bench PRIVATE lob benchmark::benchmark)
+  target_compile_options(lob_bench PRIVATE ${LOB_WARNINGS})
+endif()
+
 # ---- Tests -----------------------------------------------------------------
 if(LOB_BUILD_TESTS)
-  include(FetchContent)
   FetchContent_Declare(googletest
     URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
     DOWNLOAD_EXTRACT_TIMESTAMP TRUE

@@ -64,3 +64,75 @@ cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build build
 ```
 
 Decodes a full trading day (28.7M messages) at 160M msgs/s with a determinism checksum.
+
+## Order book and matching engine
+
+**Machine:** AMD Ryzen 5 5600X (6C/12T, TSC 3.69 GHz), WSL2 Ubuntu 24.04, GCC 13.3,
+`-O3 -march=native` (CMake `Release`, `-DLOB_NATIVE=ON`). Pinned to one core with
+`taskset -c 2`. Every number is the **median of 5 repetitions**, each after a warm-up.
+
+**Latency** is the time for one operation, read with `rdtsc` and fences either side and
+recorded in a histogram with one-cycle resolution. Percentiles are p50 / p99 / p99.9 in ns.
+On this machine:
+
+- **Timer overhead:** an empty timed region costs **18 ns at p50**. That's included in
+  every latency below, so treat ~18 ns as the floor.
+- **Timer resolution:** about **10 ns**. Under WSL2 the timestamp counter only advances in
+  steps of about 37 ticks.
+- **Noise:** the synthetic benchmarks repeat within 1%. The full-day replay varies by about
+  ±8% between repetitions, because it is long, allocates heavily, and the host CPU's clock
+  speed changes.
+
+**Workloads:**
+
+- **Add / Cancel:** a book of 1,000 resting 100-share orders spread over 50 price levels per
+  side, one tick apart. Each op adds a passive order at a random level, or cancels a random
+  live order. The book is restored, untimed, after each op so its size stays fixed.
+- **Match:** the same book in `MatchingEngine`. Each op is a marketable IOC for 1–3 lots,
+  which fills 1–3 resting orders at the touch, with a fill callback.
+- **Full-day replay:** parse plus rebuild every book for the whole `20190730.BX_ITCH_50` day
+  (28.7M messages, 8,850 books). No timers inside.
+- **Real-data latency:** the book update for every order message in that day, timed
+  individually and grouped by message type.
+
+### Version history
+
+Synthetic workloads, latency p50 / p99 / p99.9 in ns:
+
+| Version | Change | Add | Cancel | Match | Full-day replay |
+|---|---|---:|---:|---:|---:|
+| v1 | `std::map` levels, `std::list` per level, `std::unordered_map` index | 55 / 83 / 101 | 64 / 92 / 119 | 83 / 129 / 165 | 12.2 M msg/s (82 ns/msg) |
+
+Real ITCH data (every book update in the BX day), latency p50 / p99 / p99.9 in ns:
+
+| Version | Add | Execute | Cancel | Delete | Replace |
+|---|---:|---:|---:|---:|---:|
+| v1 | 83 / 220 / 432 | 110 / 257 / 514 | 73 / 193 / 358 | 110 / 257 / 496 | 147 / 303 / 551 |
+
+Raw Google Benchmark output for each version is in [docs/bench/](bench/).
+
+**Correctness check for every version:** `book_replay` on the BX day must report 0 anomalies,
+no locked or crossed books, and the same top-of-book digest after every one of the 28.7M
+messages. For v1 that digest is `da514e7cf954bd6a`.
+
+### Where v1 spends its time
+
+`perf record` on the full-day replay, by source line:
+
+| Cost | Share | Cause |
+|---|---:|---|
+| `std::map` tree walk (`stl_tree.h`, `std::less`) | ~20% | finding the price level on every add and erase |
+| `std::unordered_map` (hashing, bucket chains) | ~25% | order id lookup on every message |
+| `malloc` / `free` | ~7% | one list node and one hash node per order |
+
+### Reproducing
+
+```bash
+cmake -S . -B build-native -G Ninja -DCMAKE_BUILD_TYPE=Release -DLOB_NATIVE=ON
+cmake --build build-native
+LOB_ITCH_FILE=data/20190730.BX_ITCH_50 taskset -c 2 ./build-native/lob_bench \
+  --benchmark_repetitions=5 --benchmark_report_aggregates_only=true \
+  --benchmark_out=bench.json --benchmark_out_format=json
+python3 scripts/bench_summary.py bench.json v1
+./build-native/book_replay data/20190730.BX_ITCH_50
+```
