@@ -5,6 +5,10 @@
 // Checks: every execute/cancel/delete/replace refers to a live order, no order is reduced
 // below zero, and books are never locked or crossed (best bid >= best ask), split by session.
 // Prints top of book at the 16:00 close for the most active symbols, and replay throughput.
+//
+// It also prints a digest of the top of book after every update. Any two correct book
+// implementations must produce the same digest for the same file, so the digest is used to
+// check that each optimisation leaves the replayed book unchanged.
 
 #include <algorithm>
 #include <array>
@@ -50,6 +54,7 @@ public:
     std::size_t peak_orders = 0;
     std::size_t live_orders = 0;
     std::size_t symbols_to_show = 10;
+    std::uint64_t digest = 0xcbf29ce484222325ULL;  // FNV-1a over every top-of-book state
 
     void on_message(char, std::span<const std::uint8_t> payload) {
         if (payload.size() >= 3) ++messages_per_locate[itch::read_be16(payload.data() + 1)];
@@ -100,9 +105,20 @@ private:
         ++checks[session_];
         const auto bid = b.best_bid();
         const auto ask = b.best_ask();
+        mix(locate);
+        mix(bid ? (std::uint64_t{bid->price} << 32 | bid->quantity) : 0);
+        mix(bid ? bid->order_count : 0);
+        mix(ask ? (std::uint64_t{ask->price} << 32 | ask->quantity) : 0);
+        mix(ask ? ask->order_count : 0);
         if (!bid || !ask) return;
         if (bid->price == ask->price) ++locked[session_];
         if (bid->price > ask->price) ++crossed[session_];
+    }
+
+    void mix(std::uint64_t v) {
+        for (int i = 0; i < 8; ++i) {
+            digest = (digest ^ ((v >> (8 * i)) & 0xFF)) * 0x100000001B3ULL;
+        }
     }
 
     void take_close_snapshot() {
@@ -182,8 +198,10 @@ int main(int argc, char** argv) {
                         static_cast<unsigned long long>(replay.crossed[s]));
         }
 
-        std::printf("\nOrders resting: peak %zu, end of day %zu\n\n", replay.peak_orders,
+        std::printf("\nOrders resting: peak %zu, end of day %zu\n", replay.peak_orders,
                     replay.total_orders());
+        std::printf("Top-of-book digest: %016llx\n\n",
+                    static_cast<unsigned long long>(replay.digest));
 
         std::printf("Top of book at the 16:00 close (most active symbols)\n");
         std::printf("  %-8s %22s   %22s %8s %8s %8s\n", "symbol", "bid (shares @ $)",
