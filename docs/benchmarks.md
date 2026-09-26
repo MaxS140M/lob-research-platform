@@ -97,12 +97,15 @@ On this machine:
 
 ### Version history
 
-Synthetic workloads, latency p50 / p99 / p99.9 in ns:
+Synthetic workloads, latency p50 / p99 / p99.9 in ns. **Timer** is that run's timer overhead
+at p50. It shows the CPU clock state of the run: a run with an 18 ns timer ran about 10% faster
+than one with 20 ns, so compare p50 values across rows with that in mind.
 
-| Version | Change | Add | Cancel | Match | Full-day replay |
-|---|---|---:|---:|---:|---:|
-| v1 | `std::map` levels, `std::list` per level, `std::unordered_map` index | 55 / 83 / 101 | 64 / 92 / 119 | 83 / 129 / 165 | 12.2 M msg/s (82 ns/msg) |
-| v2 | Flat sorted vector of levels per side, best at the back | 55 / 83 / 110 | 64 / 101 / 129 | 73 / 138 / 174 | 14.6 M msg/s (69 ns/msg) |
+| Version | Change | Timer | Add | Cancel | Match | Full-day replay |
+|---|---|---:|---:|---:|---:|---:|
+| v1 | `std::map` levels, `std::list` per level, `std::unordered_map` index | 18 | 55 / 83 / 101 | 64 / 92 / 119 | 83 / 129 / 165 | 12.2 M msg/s (82 ns/msg) |
+| v2 | Flat sorted vector of levels per side, best at the back | 18 | 55 / 83 / 110 | 64 / 101 / 129 | 73 / 138 / 174 | 14.6 M msg/s (69 ns/msg) |
+| v3 | Order pool with free list, intrusive per-level queues | 20 | 60 / 80 / 100 | 70 / 100 / 130 | 60 / 110 / 130 | 17.1 M msg/s (59 ns/msg) |
 
 Real ITCH data (every book update in the BX day), latency p50 / p99 / p99.9 in ns:
 
@@ -110,6 +113,7 @@ Real ITCH data (every book update in the BX day), latency p50 / p99 / p99.9 in n
 |---|---:|---:|---:|---:|---:|
 | v1 | 83 / 220 / 432 | 110 / 257 / 514 | 73 / 193 / 358 | 110 / 257 / 496 | 147 / 303 / 551 |
 | v2 | 64 / 220 / 450 | 83 / 230 / 496 | 55 / 165 / 349 | 92 / 230 / 478 | 119 / 276 / 523 |
+| v3 | 70 / 170 / 360 | 90 / 200 / 380 | 60 / 170 / 270 | 90 / 200 / 360 | 120 / 240 / 400 |
 
 Raw Google Benchmark output for each version is in [docs/bench/](bench/).
 
@@ -129,6 +133,18 @@ switches to binary search after 16 steps, so a deep book stays O(log n).
 - **Synthetic add / cancel:** flat. That workload picks one of 50 levels uniformly at random,
   which is the worst case for a scan from the touch. Most of each operation's cost is still
   the `malloc` for the list node and the `unordered_map` lookup.
+
+**v3: order pool and intrusive lists.** Orders live in one contiguous `std::vector<Node>` with
+a free list, so after warm-up an add never calls `malloc`. Each level's FIFO queue is a doubly
+linked list threaded through the pool by 32-bit `prev`/`next` indices. A level shrinks to a
+20-byte trivially copyable struct (`price, quantity, count, head, tail`), so inserting a level
+mid-vector is a `memmove`.
+
+- **Tails:** the gain shows up at the tail rather than the median. On real data, add p99.9
+  dropped from 450 to 360 ns and execute p99.9 from 496 to 380 ns.
+- **Throughput and matching:** full-day replay rose to 17.1 M msg/s, and synthetic match fell
+  from 73 / 138 to 60 / 110 ns. Allocator calls are exactly the occasional slow path that
+  shows up at p99.
 
 ### Where v1 spends its time
 
