@@ -37,8 +37,8 @@ OrderBook::NodeIndex OrderBook::allocate() {
 
 bool OrderBook::add(OrderId id, Side side, Price price, Quantity quantity, OwnerId owner) {
     if (quantity == 0) return false;
-    const auto [entry, inserted] = index_.try_emplace(id);
-    if (!inserted) return false;
+    std::uint32_t* slot = index_.try_insert(id);
+    if (slot == nullptr) return false;
 
     Levels& book = levels(side);
     const std::size_t i = lower_level(book, side, price);
@@ -58,18 +58,18 @@ bool OrderBook::add(OrderId id, Side side, Price price, Quantity quantity, Owner
     level.tail = n;
     level.quantity += quantity;
     ++level.count;
-    entry->second = n;
+    *slot = n;  // nothing below touches index_, so the slot pointer is still valid
     return true;
 }
 
 Quantity OrderBook::reduce(OrderId id, Quantity quantity) {
-    const auto entry = index_.find(id);
-    if (entry == index_.end()) return 0;
+    const NodeIndex n = index_.find(id);
+    if (n == kNull) return 0;
 
-    Node& node = pool_[entry->second];
+    Node& node = pool_[n];
     if (quantity >= node.quantity) {
         const Quantity removed = node.quantity;
-        erase(entry->second);
+        erase(n);
         return removed;
     }
     node.quantity -= quantity;
@@ -79,29 +79,29 @@ Quantity OrderBook::reduce(OrderId id, Quantity quantity) {
 }
 
 bool OrderBook::remove(OrderId id) {
-    const auto entry = index_.find(id);
-    if (entry == index_.end()) return false;
-    erase(entry->second);
+    const NodeIndex n = index_.find(id);
+    if (n == kNull) return false;
+    erase(n);
     return true;
 }
 
 bool OrderBook::replace(OrderId old_id, OrderId new_id, Price price, Quantity quantity) {
     if (quantity == 0) return false;
-    const auto entry = index_.find(old_id);
-    if (entry == index_.end()) return false;
+    const NodeIndex n = index_.find(old_id);
+    if (n == kNull) return false;
     if (new_id != old_id && index_.contains(new_id)) return false;
 
-    const Node& node = pool_[entry->second];
+    const Node& node = pool_[n];
     const Side side = node.side;
     const OwnerId owner = node.owner;
-    erase(entry->second);
+    erase(n);
     return add(new_id, side, price, quantity, owner);
 }
 
 std::optional<OrderInfo> OrderBook::find(OrderId id) const {
-    const auto entry = index_.find(id);
-    if (entry == index_.end()) return std::nullopt;
-    const Node& node = pool_[entry->second];
+    const NodeIndex n = index_.find(id);
+    if (n == kNull) return std::nullopt;
+    const Node& node = pool_[n];
     return OrderInfo{id, node.side, node.price, node.quantity, node.owner};
 }
 

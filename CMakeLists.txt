@@ -78,6 +78,7 @@ if(LOB_BUILD_TESTS)
     cpp/tests/test_matching_engine.cpp
     cpp/tests/test_order_book.cpp
     cpp/tests/test_order_book_differential.cpp
+    cpp/tests/test_order_index.cpp
   )
   target_link_libraries(lob_tests PRIVATE lob GTest::gtest_main)
   target_compile_options(lob_tests PRIVATE ${LOB_WARNINGS})
