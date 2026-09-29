@@ -19,7 +19,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
-#include <random>
 #include <string>
 #include <vector>
 
@@ -29,6 +28,7 @@
 #include "lob/mapped_file.hpp"
 #include "lob/matching_engine.hpp"
 #include "lob/order_book.hpp"
+#include "workload.hpp"
 
 namespace itch = lob::itch;
 using lob::bench::LatencyHistogram;
@@ -37,69 +37,13 @@ using lob::bench::tsc_stop;
 
 namespace {
 
-void report(benchmark::State& state, const LatencyHistogram& h, const std::string& prefix = "") {
-    state.counters[prefix + "p50_ns"] = h.percentile_ns(0.50);
-    state.counters[prefix + "p99_ns"] = h.percentile_ns(0.99);
-    state.counters[prefix + "p99.9_ns"] = h.percentile_ns(0.999);
-    state.counters[prefix + "mean_ns"] = h.mean_ns();
-}
-
-// ---- Synthetic book workload ---------------------------------------------
-// A book shaped like a liquid stock: 1,000 resting orders of 100 shares spread over 50 price
-// levels per side, one tick apart, around a $100 mid.
-
-constexpr lob::Price kMid = 1'000'000;  // $100.0000
-constexpr lob::Price kTick = 100;       // $0.01
-constexpr std::uint32_t kLevelsPerSide = 50;
-constexpr std::size_t kRestingOrders = 1'000;
-constexpr lob::Quantity kLot = 100;
-
-class SyntheticFlow {
-public:
-    explicit SyntheticFlow(std::uint64_t seed) : rng_(seed) {}
-
-    lob::Side side() { return (rng_() & 1) == 0 ? lob::Side::kBuy : lob::Side::kSell; }
-
-    lob::Price passive_price(lob::Side s) {
-        const auto offset = static_cast<lob::Price>(1 + rng_() % kLevelsPerSide);
-        return s == lob::Side::kBuy ? kMid - offset * kTick : kMid + offset * kTick;
-    }
-
-    std::size_t index(std::size_t n) { return static_cast<std::size_t>(rng_() % n); }
-
-    lob::OrderId next_id() { return next_id_++; }
-
-private:
-    std::mt19937_64 rng_;
-    lob::OrderId next_id_ = 1;
-};
-
-// Book plus the list of live ids, so a random live order can be picked in O(1).
-struct LiveBook {
-    lob::OrderBook book;
-    std::vector<lob::OrderId> live;
-    SyntheticFlow flow{42};
-
-    LiveBook() {
-        live.reserve(kRestingOrders * 2);
-        while (live.size() < kRestingOrders) add_random();
-    }
-
-    void add_random() {
-        const lob::Side s = flow.side();
-        const lob::OrderId id = flow.next_id();
-        book.add(id, s, flow.passive_price(s), kLot);
-        live.push_back(id);
-    }
-
-    lob::OrderId take_random() {
-        const std::size_t i = flow.index(live.size());
-        const lob::OrderId id = live[i];
-        live[i] = live.back();
-        live.pop_back();
-        return id;
-    }
-};
+using lob::bench::kLevelsPerSide;
+using lob::bench::kLot;
+using lob::bench::kMid;
+using lob::bench::kRestingOrders;
+using lob::bench::kTick;
+using lob::bench::report;
+using lob::bench::SyntheticFlow;
 
 void BM_TimerOverhead(benchmark::State& state) {
     LatencyHistogram h;
@@ -112,41 +56,10 @@ void BM_TimerOverhead(benchmark::State& state) {
 }
 BENCHMARK(BM_TimerOverhead)->MinWarmUpTime(0.5);
 
-void BM_BookAdd(benchmark::State& state) {
-    LiveBook b;
-    LatencyHistogram h;
-    for (auto _ : state) {
-        const lob::Side s = b.flow.side();
-        const lob::Price price = b.flow.passive_price(s);
-        const lob::OrderId id = b.flow.next_id();
-
-        const std::uint64_t t0 = tsc_start();
-        b.book.add(id, s, price, kLot);
-        const std::uint64_t t1 = tsc_stop();
-        h.record(t1 - t0);
-
-        b.live.push_back(id);
-        b.book.remove(b.take_random());  // keep the book size steady (untimed)
-    }
-    report(state, h);
-}
+void BM_BookAdd(benchmark::State& state) { lob::bench::run_book_add<lob::OrderBook>(state); }
 BENCHMARK(BM_BookAdd)->MinWarmUpTime(0.5)->MinTime(2.0);
 
-void BM_BookCancel(benchmark::State& state) {
-    LiveBook b;
-    LatencyHistogram h;
-    for (auto _ : state) {
-        const lob::OrderId id = b.take_random();
-
-        const std::uint64_t t0 = tsc_start();
-        b.book.remove(id);
-        const std::uint64_t t1 = tsc_stop();
-        h.record(t1 - t0);
-
-        b.add_random();  // replace it (untimed)
-    }
-    report(state, h);
-}
+void BM_BookCancel(benchmark::State& state) { lob::bench::run_book_cancel<lob::OrderBook>(state); }
 BENCHMARK(BM_BookCancel)->MinWarmUpTime(0.5)->MinTime(2.0);
 
 void BM_EngineMatch(benchmark::State& state) {
@@ -193,14 +106,7 @@ BENCHMARK(BM_EngineMatch)->MinWarmUpTime(0.5)->MinTime(2.0);
 
 // ---- Real ITCH data ------------------------------------------------------
 
-const lob::MappedFile* itch_file() {
-    static const std::unique_ptr<lob::MappedFile> file = []() -> std::unique_ptr<lob::MappedFile> {
-        const char* path = std::getenv("LOB_ITCH_FILE");
-        if (path == nullptr) return nullptr;
-        return std::make_unique<lob::MappedFile>(path);
-    }();
-    return file.get();
-}
+using lob::bench::itch_file;
 
 void BM_ReplayThroughput(benchmark::State& state) {
     const lob::MappedFile* file = itch_file();
