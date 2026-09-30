@@ -2,6 +2,54 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-17
+
+Order book, matching engine and benchmarks.
+
+### Added
+
+- `lob::OrderBook`, a single-instrument limit order book with price-time priority. It
+  supports add, reduce, remove, cancel-replace (which loses time priority), top of book,
+  depth, and front-of-queue access for matching. ([#5])
+- `lob::BookBuilder`, an ITCH `parse()` handler that rebuilds a book per stock locate and
+  counts anomalies instead of failing. ([#5])
+- `book_replay` tool. It replays a full day and reports anomalies, locked or crossed books
+  by session, top of book at the 16:00 close, and a top-of-book digest over every update.
+  On the 30 July 2019 BX day it finds 0 anomalies, no locked or crossed books, and closing
+  quotes that match that day's real prices. ([#5], [#7])
+- `lob::MatchingEngine`, with price-time priority and limit, market, IOC and cancel orders.
+  Each trade emits a `Fill` event (price, quantity, aggressor side, both order ids) through
+  a compile-time callback. Self-trade prevention can cancel either the incoming or the
+  resting order. ([#6])
+- `lob::OrderIndex`, an open-addressing hash map with linear probing, Fibonacci hashing and
+  backward-shift deletion. ([#8])
+- `lob_bench`, a Google Benchmark suite:
+  - Per-operation p50 / p99 / p99.9 latency for add, cancel and match, read with `rdtsc`
+    into a one-cycle histogram.
+  - Latency of every book update in a real ITCH day, by message type.
+  - Full-day replay throughput.
+  - Same-run comparisons against the original implementation. ([#7], [#8])
+- `-DLOB_NATIVE=ON` CMake option for `-march=native` builds. ([#7])
+- `scripts/bench_summary.py`, which turns benchmark JSON into Markdown tables. ([#7])
+- Tests:
+  - Edge cases for the matching engine.
+  - A differential test of the matching engine against a brute-force model over 100,000
+    random orders.
+  - A differential test of `OrderBook` against the frozen original implementation.
+  - Unit and churn tests for `OrderIndex`. ([#5], [#6], [#8])
+
+### Changed
+
+- The order book was optimised in three benchmarked steps, each profiled with `perf`:
+  - **Price levels:** flat sorted vectors instead of `std::map`.
+  - **Orders:** a pooled order store with intrusive per-level queues, instead of a
+    `std::list` per level.
+  - **Order index:** open addressing instead of `std::unordered_map`.
+
+  Together, in the same run: full-day replay is 2.4× faster (12.5 to 30.3 M msg/s), and
+  real-data add p99 latency fell from 210 to 120 ns. See
+  [docs/benchmarks.md](docs/benchmarks.md). ([#8])
+
 ## [0.2.0] - 2026-10-17
 
 ITCH 5.0 market data parser.
@@ -51,9 +99,14 @@ Project skeleton, build and CI.
 - `lobpy` Python package with pytest. ([#1])
 - GitHub Actions CI running the C++ and Python test suites. ([#1])
 
-[Unreleased]: https://github.com/MaxS140M/lob-research-platform/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/MaxS140M/lob-research-platform/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/MaxS140M/lob-research-platform/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/MaxS140M/lob-research-platform/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/MaxS140M/lob-research-platform/releases/tag/v0.1.0
 [#1]: https://github.com/MaxS140M/lob-research-platform/pull/1
 [#2]: https://github.com/MaxS140M/lob-research-platform/pull/2
 [#3]: https://github.com/MaxS140M/lob-research-platform/pull/3
+[#5]: https://github.com/MaxS140M/lob-research-platform/pull/5
+[#6]: https://github.com/MaxS140M/lob-research-platform/pull/6
+[#7]: https://github.com/MaxS140M/lob-research-platform/pull/7
+[#8]: https://github.com/MaxS140M/lob-research-platform/pull/8
