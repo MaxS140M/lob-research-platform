@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(lob VERSION 0.2.0 LANGUAGES CXX)
+project(lob VERSION 0.3.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -55,8 +55,9 @@ if(LOB_BUILD_BENCHMARKS)
   set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
   FetchContent_MakeAvailable(benchmark)
 
-  add_executable(lob_bench cpp/bench/bench_book.cpp)
+  add_executable(lob_bench cpp/bench/bench_book.cpp cpp/bench/bench_compare.cpp)
   target_link_libraries(lob_bench PRIVATE lob benchmark::benchmark)
+  target_include_directories(lob_bench PRIVATE cpp/tests)  # for the frozen v1 reference book
   target_compile_options(lob_bench PRIVATE ${LOB_WARNINGS})
 endif()
 
@@ -77,6 +78,8 @@ if(LOB_BUILD_TESTS)
     cpp/tests/test_mapped_file.cpp
     cpp/tests/test_matching_engine.cpp
     cpp/tests/test_order_book.cpp
+    cpp/tests/test_order_book_differential.cpp
+    cpp/tests/test_order_index.cpp
   )
   target_link_libraries(lob_tests PRIVATE lob GTest::gtest_main)
   target_compile_options(lob_tests PRIVATE ${LOB_WARNINGS})

@@ -67,6 +67,28 @@ Decodes a full trading day (28.7M messages) at 160M msgs/s with a determinism ch
 
 ## Order book and matching engine
 
+### Headline: v1 vs v4 in the same run
+
+Both books run through identical workload and replay code in one process
+(`BM_Compare_*` in [bench_compare.cpp](../cpp/bench/bench_compare.cpp)). Google Benchmark's
+`--benchmark_enable_random_interleaving` mixes the two versions' repetitions in random order,
+so CPU clock drift affects both equally.
+
+| Workload | v1 (`std::map` / `std::list` / `std::unordered_map`) | v4 (current) | Change |
+|---|---:|---:|---:|
+| **Full-day replay throughput** | 12.5 M msg/s | **30.3 M msg/s** | **2.4×** |
+| Real-data add, p50 / p99 / p99.9 | 90 / 210 / 421 ns | **50 / 120 / 331 ns** | p99 −43% |
+| Real-data execute, p50 / p99 | 110 / 240 ns | **60 / 150 ns** | p99 −38% |
+| Real-data delete, p50 / p99 | 110 / 230 ns | **60 / 140 ns** | p99 −39% |
+| Synthetic add, p50 / p99 / p99.9 | 60 / 90 / 110 ns | 50 / 80 / 100 ns | |
+| Synthetic cancel, p50 / p99 / p99.9 | 70 / 100 / 130 ns | 60 / 100 / 120 ns | |
+
+All latencies include about 18–20 ns of timer overhead. The replay here uses a minimal
+replayer with no anomaly bookkeeping, so its throughput is a little higher than
+`BM_ReplayThroughput`, which goes through `BookBuilder`.
+
+### Method
+
 **Machine:** AMD Ryzen 5 5600X (6C/12T, TSC 3.69 GHz), WSL2 Ubuntu 24.04, GCC 13.3,
 `-O3 -march=native` (CMake `Release`, `-DLOB_NATIVE=ON`). Pinned to one core with
 `taskset -c 2`. Every number is the **median of 5 repetitions**, each after a warm-up.
@@ -75,13 +97,14 @@ Decodes a full trading day (28.7M messages) at 160M msgs/s with a determinism ch
 recorded in a histogram with one-cycle resolution. Percentiles are p50 / p99 / p99.9 in ns.
 On this machine:
 
-- **Timer overhead:** an empty timed region costs **18 ns at p50**. That's included in
-  every latency below, so treat ~18 ns as the floor.
+- **Timer overhead:** an empty timed region costs **18–20 ns at p50**. That's included in
+  every latency below, so treat it as the floor.
 - **Timer resolution:** about **10 ns**. Under WSL2 the timestamp counter only advances in
   steps of about 37 ticks.
-- **Noise:** the synthetic benchmarks repeat within 1%. The full-day replay varies by about
-  ±8% between repetitions, because it is long, allocates heavily, and the host CPU's clock
-  speed changes.
+- **Noise:** within a run, the synthetic benchmarks repeat within 1% and the full-day replay
+  varies by about ±8%. Between runs the host CPU's clock speed can shift results by about
+  10%, which the **Timer** column below makes visible. That's why the headline comparison
+  above is measured in a single run.
 
 **Workloads:**
 
@@ -95,29 +118,43 @@ On this machine:
 - **Real-data latency:** the book update for every order message in that day, timed
   individually and grouped by message type.
 
+**Correctness check for every version:**
+
+- **Unit tests:** pass, plus a differential test of `OrderBook` against the frozen v1 code
+  ([reference_order_book.hpp](../cpp/tests/reference_order_book.hpp)) under random
+  operations.
+- **Real-day replay:** `book_replay` on the BX day must report 0 anomalies, no locked or
+  crossed books, and the same top-of-book digest after every one of the 28.7M messages.
+  The digest is `da514e7cf954bd6a` for every version.
+
 ### Version history
 
-Synthetic workloads, latency p50 / p99 / p99.9 in ns:
+Each row is a separate run, so read p50 differences against that run's **Timer** value: a run
+with an 18 ns timer ran about 10% faster than one with 20 ns. Synthetic workloads, latency
+p50 / p99 / p99.9 in ns:
 
-| Version | Change | Add | Cancel | Match | Full-day replay |
-|---|---|---:|---:|---:|---:|
-| v1 | `std::map` levels, `std::list` per level, `std::unordered_map` index | 55 / 83 / 101 | 64 / 92 / 119 | 83 / 129 / 165 | 12.2 M msg/s (82 ns/msg) |
+| Version | Change | Timer | Add | Cancel | Match | Full-day replay |
+|---|---|---:|---:|---:|---:|---:|
+| v1 | `std::map` levels, `std::list` per level, `std::unordered_map` index | 18 | 55 / 83 / 101 | 64 / 92 / 119 | 83 / 129 / 165 | 12.2 M msg/s (82 ns/msg) |
+| v2 | Flat sorted vector of levels per side, best at the back | 18 | 55 / 83 / 110 | 64 / 101 / 129 | 73 / 138 / 174 | 14.6 M msg/s (69 ns/msg) |
+| v3 | Order pool with free list, intrusive per-level queues | 20 | 60 / 80 / 100 | 70 / 100 / 130 | 60 / 110 / 130 | 17.1 M msg/s (59 ns/msg) |
+| v4 | Open-addressing order index | 19 | 48 / 77 / 96 | 58 / 96 / 125 | 58 / 96 / 115 | 25.9 M msg/s (39 ns/msg) |
 
 Real ITCH data (every book update in the BX day), latency p50 / p99 / p99.9 in ns:
 
 | Version | Add | Execute | Cancel | Delete | Replace |
 |---|---:|---:|---:|---:|---:|
 | v1 | 83 / 220 / 432 | 110 / 257 / 514 | 73 / 193 / 358 | 110 / 257 / 496 | 147 / 303 / 551 |
+| v2 | 64 / 220 / 450 | 83 / 230 / 496 | 55 / 165 / 349 | 92 / 230 / 478 | 119 / 276 / 523 |
+| v3 | 70 / 170 / 360 | 90 / 200 / 380 | 60 / 170 / 270 | 90 / 200 / 360 | 120 / 240 / 400 |
+| v4 | 48 / 125 / 336 | 58 / 163 / 336 | 48 / 144 / 230 | 58 / 153 / 317 | 77 / 173 / 326 |
 
 Raw Google Benchmark output for each version is in [docs/bench/](bench/).
 
-**Correctness check for every version:** `book_replay` on the BX day must report 0 anomalies,
-no locked or crossed books, and the same top-of-book digest after every one of the 28.7M
-messages. For v1 that digest is `da514e7cf954bd6a`.
+### Profiling v1
 
-### Where v1 spends its time
-
-`perf record` on the full-day replay, by source line:
+`perf record` on the full-day replay, by source line. These three costs set the plan for the
+optimisations:
 
 | Cost | Share | Cause |
 |---|---:|---|
@@ -125,14 +162,85 @@ messages. For v1 that digest is `da514e7cf954bd6a`.
 | `std::unordered_map` (hashing, bucket chains) | ~25% | order id lookup on every message |
 | `malloc` / `free` | ~7% | one list node and one hash node per order |
 
+### What each version changed
+
+**v2: flat price levels.** Each side's levels are kept in one sorted `std::vector`, ordered
+worst to best, so the best level is `back()`. Finding a level scans back from the touch and
+switches to binary search after 16 steps, so a deep book stays O(log n).
+
+- **Real data:** clear gains. Add p50 dropped from 83 to 64 ns, execute from 110 to 83 ns,
+  and full-day throughput rose 20%. Real books are shallow and most updates are within a
+  few levels of the touch.
+- **Synthetic add / cancel:** flat. That workload picks one of 50 levels uniformly at random,
+  which is the worst case for a scan from the touch. Most of each operation's cost is still
+  the `malloc` for the list node and the `unordered_map` lookup.
+
+*Why not an array indexed directly by price?* It would make finding a level O(1) with no
+search. But ITCH prices are in units of $0.0001, and one book can hold a far-away "stub"
+quote alongside the real ones. Covering that range takes millions of slots per book, across
+8,850 books. A sorted vector costs memory only for levels that actually exist, and since
+activity is concentrated at the touch, the search from the back is short.
+
+**v3: order pool and intrusive lists.** Orders live in one contiguous `std::vector<Node>` with
+a free list, so after warm-up an add never calls `malloc`. Each level's FIFO queue is a doubly
+linked list threaded through the pool by 32-bit `prev`/`next` indices. A level shrinks to a
+20-byte trivially copyable struct (`price, quantity, count, head, tail`), so inserting a level
+mid-vector is a `memmove`.
+
+- **Tails:** the gain shows up at the tail rather than the median. On real data, add p99.9
+  dropped from 450 to 360 ns and execute p99.9 from 496 to 380 ns.
+- **Throughput and matching:** full-day replay rose to 17.1 M msg/s, and synthetic match fell
+  from 73 / 138 to 60 / 110 ns. Allocator calls are exactly the occasional slow path that
+  shows up at p99.
+
+**v4: open-addressing order index.** `std::unordered_map` is replaced by
+[`OrderIndex`](../cpp/include/lob/order_index.hpp):
+
+- **Storage:** one flat array of `{id, slot}` pairs with linear probing, kept at most half
+  full.
+- **Hashing:** Fibonacci hashing, which spreads ITCH's sequential order references evenly.
+- **Deletion:** backward-shift deletion, so there are no tombstones and probe lengths don't
+  degrade over the day.
+
+A lookup is usually one cache line, where `unordered_map` needs a bucket read plus a
+pointer chase to a heap node. This was the largest single gain: full-day replay rose 51%
+(17.1 to 25.9 M msg/s), and real-data add p50 / p99 fell from 70 / 170 to 48 / 125 ns.
+
+**Already in place from the start.** The best bid and ask have been tracked incrementally since
+v2: the best level is `back()`, O(1), with no search. There are no virtual calls or
+`std::function` on the hot path in any version. The parser handler, the book and the
+matching engine's fill callback are all template parameters, so the compiler inlines them.
+
+### What's left
+
+`perf` on v4 shows the remaining time is mostly memory latency:
+
+| Cost | Share | Cause |
+|---|---:|---|
+| Level search in `lower_level` | ~15% | erase and reduce find the order's level by price |
+| `pool_[n]` loads | ~13% | cache misses on the order's node (the pool for the day's peak is ~2 MB) |
+| `OrderIndex::find` probe | ~10% | cache misses on the hash slot |
+
+Each message refers to an essentially random resting order, so one or two cache misses per
+message are inherent. Further gains would come from hiding that latency, for example by
+prefetching the next message's hash slot while the current one is processed, rather than from
+a different container.
+
 ### Reproducing
 
 ```bash
 cmake -S . -B build-native -G Ninja -DCMAKE_BUILD_TYPE=Release -DLOB_NATIVE=ON
 cmake --build build-native
-LOB_ITCH_FILE=data/20190730.BX_ITCH_50 taskset -c 2 ./build-native/lob_bench \
+./build-native/book_replay data/20190730.BX_ITCH_50           # correctness and digest
+
+export LOB_ITCH_FILE=data/20190730.BX_ITCH_50
+# Version table (current book only)
+taskset -c 2 ./build-native/lob_bench --benchmark_filter=-Compare \
   --benchmark_repetitions=5 --benchmark_report_aggregates_only=true \
   --benchmark_out=bench.json --benchmark_out_format=json
-python3 scripts/bench_summary.py bench.json v1
-./build-native/book_replay data/20190730.BX_ITCH_50
+python3 scripts/bench_summary.py bench.json v4
+# Headline comparison against v1, same run
+taskset -c 2 ./build-native/lob_bench --benchmark_filter=Compare \
+  --benchmark_enable_random_interleaving=true --benchmark_repetitions=5 \
+  --benchmark_report_aggregates_only=true
 ```
