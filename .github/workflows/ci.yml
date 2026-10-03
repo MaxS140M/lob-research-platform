@@ -30,7 +30,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install package
-        run: pip install -e ".[dev]"
+      - name: Build and install package (compiles the C++ extension)
+        run: pip install ".[dev]"
       - name: Test
         run: pytest
