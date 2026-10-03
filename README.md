@@ -9,9 +9,9 @@ A small version of the research stack a trading firm runs internally. A fast C++
 replays a full day of NASDAQ TotalView-ITCH 5.0 data and rebuilds the order book. A Python
 layer drives that engine to backtest an ML short-horizon price signal.
 
-> **Status:** in development. The ITCH 5.0 parser, order book and matching engine are complete;
-> the Python bindings, backtester and ML signal are in progress. See [CHANGELOG.md](CHANGELOG.md)
-> for releases.
+> **Status:** in development. The ITCH 5.0 parser, order book, matching engine and Python
+> bindings are complete; the backtester and ML signal are in progress. See
+> [CHANGELOG.md](CHANGELOG.md) for releases.
 
 ## Highlights
 
@@ -29,6 +29,10 @@ layer drives that engine to backtest an ML short-horizon price signal.
 - **Matching engine:** price-time priority with limit, market, IOC and cancel orders, fill
   events and self-trade prevention. It's checked against a brute-force model over 100,000
   random orders.
+- **Python bindings (pybind11):** `lobpy.Replayer` replays the day in C++ and returns order
+  book snapshots and trades as **zero-copy NumPy arrays**, with the GIL released during the
+  replay. One-second, five-level snapshots for four stocks over the trading day take
+  **0.25 s**. See the [notebook](notebooks/01_replay_snapshots.ipynb).
 - **ITCH 5.0 parser:** parses the full day (837 MB) in **0.18 s with full field decoding**,
   6.3 ns per message. The file is memory-mapped and read without copying.
 - **Benchmark method:** latency measured per operation with `rdtsc` (p50 / p99 / p99.9),
@@ -43,12 +47,15 @@ cpp/
   src/           implementation
   tests/         GoogleTest unit tests
   bench/         Google Benchmark speed tests
+  tools/         command-line tools (itch_stats, book_replay)
 python/
-  lobpy/         Python package: backtester, features, models
+  lobpy/         Python package: bindings, DataFrame helpers (backtester and models to come)
   tests/         pytest tests
 notebooks/       research notebooks
+testdata/        tiny hand-built ITCH file shared by the C++ and Python tests
+scripts/         sample-file generator, benchmark summary
 data/            raw ITCH files (not committed)
-docs/            architecture, write-up, benchmark charts
+docs/            benchmarks and write-ups
 ```
 
 ## Building
@@ -121,13 +128,29 @@ LOB_ITCH_FILE=data/20190730.BX_ITCH_50 taskset -c 2 ./build-native/lob_bench
 
 ## Python package
 
-Requires Python 3.11+.
+Requires Python 3.11+ and the C++ toolchain above. `pip` builds the C++ engine and its
+pybind11 extension through the same CMake file, via scikit-build-core.
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+pip install ".[dev]"          # or ".[dev,notebook]" to run the notebooks
 pytest
 ```
+
+The C++ is compiled at install time, so rerun `pip install .` after changing it.
+
+```python
+import lobpy
+
+r = lobpy.Replayer("data/20190730.BX_ITCH_50", ["AAPL", "MSFT"])
+snaps = r.snapshots(interval_ns=1_000_000_000, depth=5)   # dict of NumPy arrays, zero-copy
+trades = r.trades()                                       # every execution, with aggressor side
+
+df = lobpy.snapshots_frame(snaps, r.symbols)              # pandas: bid_px_1..5, mid, spread, ...
+```
+
+Prices stay integers with 4 implied decimals (`int64`) in the raw arrays. The DataFrame helpers
+convert them to dollars.
 
 ## Data
 
