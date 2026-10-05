@@ -69,6 +69,34 @@ py::dict trades(const lob::Replayer& replayer) {
     return out;
 }
 
+py::dict events(const lob::Replayer& replayer, const std::string& symbol, std::size_t depth,
+                std::optional<std::uint64_t> start_ns, std::optional<std::uint64_t> end_ns) {
+    lob::EventData d;
+    {
+        py::gil_scoped_release release;
+        d = replayer.events(symbol, depth, start_ns, end_ns);
+    }
+    const auto rows = static_cast<py::ssize_t>(d.rows());
+    const auto levels = static_cast<py::ssize_t>(d.depth);
+    py::dict out;
+    out["timestamp"] = to_numpy(std::move(d.timestamp), {rows});
+    out["seq"] = to_numpy(std::move(d.seq), {rows});
+    out["kind"] = to_numpy(std::move(d.kind), {rows});
+    out["side"] = to_numpy(std::move(d.side), {rows});
+    out["price"] = to_numpy(std::move(d.price), {rows});
+    out["shares"] = to_numpy(std::move(d.shares), {rows});
+    out["trade_price"] = to_numpy(std::move(d.trade_price), {rows});
+    out["priority"] = to_numpy(std::move(d.priority), {rows});
+    out["old_price"] = to_numpy(std::move(d.old_price), {rows});
+    out["old_shares"] = to_numpy(std::move(d.old_shares), {rows});
+    out["old_priority"] = to_numpy(std::move(d.old_priority), {rows});
+    out["bid_price"] = to_numpy(std::move(d.bid_price), {rows, levels});
+    out["bid_size"] = to_numpy(std::move(d.bid_size), {rows, levels});
+    out["ask_price"] = to_numpy(std::move(d.ask_price), {rows, levels});
+    out["ask_size"] = to_numpy(std::move(d.ask_size), {rows, levels});
+    return out;
+}
+
 }  // namespace
 
 PYBIND11_MODULE(_lob, m) {
@@ -98,6 +126,16 @@ Each snapshot reflects every message with timestamp <= its sample time. Returns 
 NumPy arrays: timestamp [n] (ns since midnight), symbol [n] (index into .symbols), and
 bid_price, bid_size, ask_price, ask_size [n, depth], best level first. Missing levels are 0.
 Prices are int64 with 4 implied decimals (divide by PRICE_SCALE for dollars).
+)doc")
+        .def("events", &events, py::arg("symbol"), py::arg("depth") = 5,
+             py::arg("start_ns") = py::none(), py::arg("end_ns") = py::none(), R"doc(
+Every book event for one symbol, in file order: the feed for an event-driven backtest.
+
+One row per message touching the symbol: timestamp, seq (per-symbol message counter), kind
+(ITCH type byte: A, E, C, X, D, U, P, Q), side (+1 bid / -1 ask of the resting order; 0 for
+crosses), price (its level), shares, trade_price (E/C/P/Q), priority (seq at which the order
+took its queue position; a replace gets a new one), old_price / old_shares / old_priority
+(replaces only), and bid/ask price and size [n, depth] after the event.
 )doc")
         .def("trades", &trades, R"doc(
 Every execution for the chosen symbols, in file order.
