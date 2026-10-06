@@ -126,3 +126,53 @@ TEST(Replayer, TradesOnlyForChosenSymbols) {
     EXPECT_EQ(t.kind[0], 'P');
     EXPECT_EQ(t.symbol[0], 0);  // index into this Replayer's symbols
 }
+
+TEST(Replayer, EventsListEveryBookEventWithQueuePriority) {
+    const lob::Replayer r(kSample, {});
+    const lob::EventData e = r.events("AAA", 2);
+
+    ASSERT_EQ(e.rows(), 9U);
+    EXPECT_EQ(e.kind, (std::vector<std::uint8_t>{'A', 'A', 'A', 'A', 'E', 'X', 'C', 'U', 'Q'}));
+    EXPECT_EQ(e.seq, (std::vector<std::int64_t>{1, 2, 3, 4, 5, 6, 7, 8, 9}));
+    EXPECT_EQ(e.side, (std::vector<std::int8_t>{1, 1, -1, -1, -1, 1, 1, -1, 0}));
+    EXPECT_EQ(e.price, (std::vector<std::int64_t>{100'000, 99'900, 100'100, 100'200, 100'100,
+                                                  99'900, 100'000, 100'150, 100'000}));
+    EXPECT_EQ(e.shares, (std::vector<std::int64_t>{100, 200, 150, 50, 50, 50, 100, 80, 1'000}));
+    // Executions carry the trade price: the resting price for E, the stated price for C.
+    EXPECT_EQ(e.trade_price,
+              (std::vector<std::int64_t>{0, 0, 0, 0, 100'100, 0, 99'950, 0, 100'000}));
+    // An add takes the current seq as its priority; execute, cancel and delete report the
+    // affected order's original priority; a replace gets a new one (it loses its place).
+    EXPECT_EQ(e.priority, (std::vector<std::int64_t>{1, 2, 3, 4, 3, 2, 1, 8, 0}));
+    EXPECT_EQ(e.old_price[7], 100'200);
+    EXPECT_EQ(e.old_shares[7], 50);
+    EXPECT_EQ(e.old_priority[7], 4);
+
+    // Book after the execution (row 4): bids 100 @ 10.00, 200 @ 9.99; asks 100 @ 10.01, 50 @ 10.02.
+    const std::size_t r4 = 4 * e.depth;
+    EXPECT_EQ(e.bid_price[r4], 100'000);
+    EXPECT_EQ(e.bid_size[r4 + 1], 200);
+    EXPECT_EQ(e.ask_price[r4], 100'100);
+    EXPECT_EQ(e.ask_size[r4], 100);
+    EXPECT_EQ(e.ask_price[r4 + 1], 100'200);
+}
+
+TEST(Replayer, EventsForOtherSymbolCoverDeleteAndHiddenTrade) {
+    const lob::Replayer r(kSample, {});
+    const lob::EventData e = r.events("BBB", 1);
+    EXPECT_EQ(e.kind, (std::vector<std::uint8_t>{'A', 'A', 'D', 'P'}));  // F arrives as an add
+    EXPECT_EQ(e.priority[2], 2);                                         // the deleted bid's
+    EXPECT_EQ(e.shares[2], 100);
+    EXPECT_EQ(e.side[3], -1);  // the hidden order that traded was a sell
+    EXPECT_EQ(e.trade_price[3], 499'800);
+}
+
+TEST(Replayer, EventsWindowKeepsBookAndSequenceFromStartOfFile) {
+    const lob::Replayer r(kSample, {});
+    const lob::EventData e = r.events("AAA", 1, 11 * kSecond, 12 * kSecond);
+    ASSERT_EQ(e.rows(), 3U);  // E at 11.0, X at 11.5, C at 12.0
+    EXPECT_EQ(e.seq.front(), 5);
+    EXPECT_EQ(e.bid_price[0], 100'000);  // the book before the window is still there
+    EXPECT_THROW((void)r.events("ZZZ", 1), std::invalid_argument);
+    EXPECT_THROW((void)r.events("AAA", 0), std::invalid_argument);
+}

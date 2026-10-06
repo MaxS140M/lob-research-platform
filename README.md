@@ -9,8 +9,8 @@ A small version of the research stack a trading firm runs internally. A fast C++
 replays a full day of NASDAQ TotalView-ITCH 5.0 data and rebuilds the order book. A Python
 layer drives that engine to backtest an ML short-horizon price signal.
 
-> **Status:** in development. The ITCH 5.0 parser, order book, matching engine and Python
-> bindings are complete; the backtester and ML signal are in progress. See
+> **Status:** in development. The ITCH 5.0 parser, order book, matching engine, Python bindings
+> and event-driven backtester are complete; the ML signal is in progress. See
 > [CHANGELOG.md](CHANGELOG.md) for releases.
 
 ## Highlights
@@ -29,6 +29,17 @@ layer drives that engine to backtest an ML short-horizon price signal.
 - **Matching engine:** price-time priority with limit, market, IOC and cancel orders, fill
   events and self-trade prevention. It's checked against a brute-force model over 100,000
   random orders.
+- **Event-driven backtester:** a strategy sees one book event at a time, and its orders face
+  realistic fills:
+  - **latency** (10 µs to 1 ms)
+  - **spread crossing** level by level
+  - **queue position** tracked order by order, using queue priorities from the C++ engine
+  - **fees**, **risk limits** and a **forced flat** before the close
+
+  Results come with Sharpe, drawdown, fill rate, turnover, and a **PnL breakdown into
+  signal, spread and fees**. On real data it shows why an order book imbalance signal that
+  predicts correctly still loses money once it pays the spread. See
+  [docs/backtest.md](docs/backtest.md).
 - **Python bindings (pybind11):** `lobpy.Replayer` replays the day in C++ and returns order
   book snapshots and trades as **zero-copy NumPy arrays**, with the GIL released during the
   replay. One-second, five-level snapshots for four stocks over the trading day take
@@ -151,6 +162,31 @@ df = lobpy.snapshots_frame(snaps, r.symbols)              # pandas: bid_px_1..5,
 
 Prices stay integers with 4 implied decimals (`int64`) in the raw arrays. The DataFrame helpers
 convert them to dollars.
+
+### Backtesting a strategy
+
+```python
+import lobpy
+from lobpy.backtest import BUY, BacktestConfig, Backtester, EventFeed, LimitOrder
+
+class JoinTheBid:
+    """Buy 100 at the best bid once; the backtester flattens before the close."""
+    def __init__(self):
+        self.sent = False
+    def on_book_update(self, book):              # sees one event at a time, never the future
+        if not self.sent and book.bid_price:
+            self.sent = True
+            return [LimitOrder(BUY, 100, book.bid_price)]   # joins the back of the queue
+    def on_fill(self, fill):
+        print(fill)
+
+feed = EventFeed.from_replayer(lobpy.Replayer("data/20190730.BX_ITCH_50", ["SPY"]), "SPY")
+result = Backtester(feed, BacktestConfig(latency_ns=100_000)).run(JoinTheBid())
+print(result.summary())     # net PnL split into signal / spread / fees, Sharpe, drawdown, ...
+```
+
+`python3 scripts/run_backtests.py data/20190730.BX_ITCH_50 SPY AAPL` reproduces the tables in
+[docs/backtest.md](docs/backtest.md).
 
 ## Data
 
