@@ -90,8 +90,12 @@ def test_snapshot_window_and_subset():
 
 def test_trades_match_hand_computed_executions(replayer):
     t = replayer.trades()
-    assert t["timestamp"].tolist() == [11 * SECOND, 12 * SECOND, 13 * SECOND + SECOND // 2,
-                                       14 * SECOND]
+    assert t["timestamp"].tolist() == [
+        11 * SECOND,
+        12 * SECOND,
+        13 * SECOND + SECOND // 2,
+        14 * SECOND,
+    ]
     assert t["symbol"].tolist() == [0, 0, 1, 0]
     assert t["price"].tolist() == [100_100, 99_950, 499_800, 100_000]
     assert t["shares"].tolist() == [50, 100, 25, 1_000]

@@ -8,7 +8,10 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    from .feed import EventFeed
 
 BUY = 1
 SELL = -1
@@ -81,12 +84,33 @@ class BookSnapshot:
     """
 
     __slots__ = (
-        "timestamp", "kind", "bid_price", "bid_size", "ask_price", "ask_size",
-        "trade_price", "trade_shares", "trade_side", "_levels", "_row",
-    )  # fmt: skip
+        "timestamp",
+        "kind",
+        "bid_price",
+        "bid_size",
+        "ask_price",
+        "ask_size",
+        "trade_price",
+        "trade_shares",
+        "trade_side",
+        "_levels",
+        "_row",
+    )
 
-    def __init__(self, timestamp, kind, bid_price, bid_size, ask_price, ask_size,
-                 trade_price=0, trade_shares=0, trade_side=0, levels=None, row=-1):  # fmt: skip
+    def __init__(
+        self,
+        timestamp: int,
+        kind: str,
+        bid_price: int,
+        bid_size: int,
+        ask_price: int,
+        ask_size: int,
+        trade_price: int = 0,
+        trade_shares: int = 0,
+        trade_side: int = 0,
+        levels: EventFeed | None = None,
+        row: int = -1,
+    ) -> None:
         self.timestamp = timestamp
         self.kind = kind
         self.bid_price = bid_price
@@ -123,8 +147,10 @@ class BookSnapshot:
         """[(price, size), ...] best first for BUY (bids) or SELL (asks), up to the feed depth."""
         if self._levels is None:
             return []
-        prices, sizes = self._levels.bids(self._row) if side == BUY else self._levels.asks(self._row)
-        return [(p, s) for p, s in zip(prices, sizes) if s > 0]
+        prices, sizes = (
+            self._levels.bids(self._row) if side == BUY else self._levels.asks(self._row)
+        )
+        return [(p, s) for p, s in zip(prices, sizes, strict=True) if s > 0]
 
 
 @dataclass
@@ -168,4 +194,3 @@ class BacktestConfig:
         """Per-share fee in price units (1e-4 $)."""
         fee = self.taker_fee if liquidity == "taker" else self.maker_fee
         return round(fee * 10_000)
-

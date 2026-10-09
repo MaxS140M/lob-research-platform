@@ -49,7 +49,7 @@ class _Working:
 
     __slots__ = ("order", "side", "price", "remaining", "ahead", "join_seq")
 
-    def __init__(self, order: LimitOrder, remaining: int, ahead: float, join_seq: int):
+    def __init__(self, order: LimitOrder, remaining: int, ahead: float, join_seq: int) -> None:
         self.order = order
         self.side = order.side
         self.price = order.price
@@ -59,8 +59,13 @@ class _Working:
 
 
 class ExecutionSimulator:
-    def __init__(self, config: BacktestConfig, feed: EventFeed,
-                 on_fill: Callable[[Fill], None], on_done: Callable[[int], None]):  # fmt: skip
+    def __init__(
+        self,
+        config: BacktestConfig,
+        feed: EventFeed,
+        on_fill: Callable[[Fill], None],
+        on_done: Callable[[int], None],
+    ) -> None:
         self.config = config
         self.feed = feed
         self._on_fill = on_fill
@@ -98,7 +103,9 @@ class ExecutionSimulator:
 
     # ---- Arrival at the exchange ----
 
-    def _arrive(self, action, t: int, row: int, seq: int, mid: float) -> None:
+    def _arrive(
+        self, action: MarketOrder | LimitOrder | Cancel, t: int, row: int, seq: int, mid: float
+    ) -> None:
         if isinstance(action, Cancel):
             w = self.resting.pop(action.order_id, None)
             if w is not None:
@@ -116,12 +123,13 @@ class ExecutionSimulator:
             ahead = self._queue_ahead(row, order.side, order.price)
             self.resting[order.id] = _Working(order, remaining, ahead, seq)
 
-    def _take(self, order: Order, limit: int | None, quantity: int, row: int, t: int,
-              mid: float) -> int:  # fmt: skip
+    def _take(
+        self, order: Order, limit: int | None, quantity: int, row: int, t: int, mid: float
+    ) -> int:
         """Fills against the opposite side of the visible book; returns what is left."""
         prices, sizes = self.feed.asks(row) if order.side == BUY else self.feed.bids(row)
         remaining = quantity
-        for price, size in zip(prices, sizes):
+        for price, size in zip(prices, sizes, strict=True):
             if size <= 0 or remaining == 0:
                 break
             if limit is not None and (price > limit if order.side == BUY else price < limit):
@@ -134,7 +142,7 @@ class ExecutionSimulator:
     def _queue_ahead(self, row: int, side: int, price: int) -> float:
         """Displayed size already waiting at ``price`` on ``side`` when the order arrives."""
         prices, sizes = self.feed.bids(row) if side == BUY else self.feed.asks(row)
-        levels = [(p, s) for p, s in zip(prices, sizes) if s > 0]
+        levels = [(p, s) for p, s in zip(prices, sizes, strict=True) if s > 0]
         for p, s in levels:
             if p == price:
                 return s
@@ -149,14 +157,27 @@ class ExecutionSimulator:
 
     # ---- Book events while orders rest ----
 
-    def on_event(self, kind: int, side: int, price: int, shares: int, priority: int,
-                 old_price: int, old_shares: int, old_priority: int, bid: int, ask: int,
-                 t: int, mid: float) -> None:  # fmt: skip
+    def on_event(
+        self,
+        kind: int,
+        side: int,
+        price: int,
+        shares: int,
+        priority: int,
+        old_price: int,
+        old_shares: int,
+        old_priority: int,
+        bid: int,
+        ask: int,
+        t: int,
+        mid: float,
+    ) -> None:
         """Updates queue positions and passive fills for one book event (kind = ITCH byte)."""
         for w in list(self.resting.values()):
             if side == w.side:
-                self._same_side_event(w, kind, price, shares, priority, old_price, old_shares,
-                                      old_priority, t, mid)  # fmt: skip
+                self._same_side_event(
+                    w, kind, price, shares, priority, old_price, old_shares, old_priority, t, mid
+                )
             if w.remaining == 0:
                 continue
             # The opposite side reached our price: an incoming order there would have hit us.
@@ -164,9 +185,19 @@ class ExecutionSimulator:
             if crossed:
                 self._passive_fill(w, w.remaining, t, mid)
 
-    def _same_side_event(self, w: _Working, kind: int, price: int, shares: int, priority: int,
-                         old_price: int, old_shares: int, old_priority: int, t: int,
-                         mid: float) -> None:  # fmt: skip
+    def _same_side_event(
+        self,
+        w: _Working,
+        kind: int,
+        price: int,
+        shares: int,
+        priority: int,
+        old_price: int,
+        old_shares: int,
+        old_priority: int,
+        t: int,
+        mid: float,
+    ) -> None:
         worse = price < w.price if w.side == BUY else price > w.price
         if kind == 69 or kind == 67:  # 'E', 'C': a resting order on our side executed
             if price == w.price:
@@ -200,8 +231,9 @@ class ExecutionSimulator:
             del self.resting[w.order.id]
             self._on_done(w.order.id)
 
-    def _fill(self, order: Order, t: int, price: int, quantity: int, liquidity: str,
-              mid: float) -> None:  # fmt: skip
+    def _fill(
+        self, order: Order, t: int, price: int, quantity: int, liquidity: str, mid: float
+    ) -> None:
         fee = (self._taker_fee if liquidity == "taker" else self._maker_fee) * quantity
         self.open_quantity[order.side] -= quantity
         self.filled_shares += quantity
