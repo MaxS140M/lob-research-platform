@@ -14,22 +14,41 @@ jobs:
       - name: Install tools
         run: sudo apt-get update && sudo apt-get install -y ninja-build clang-format
       - name: Check formatting
-        run: clang-format --dry-run --Werror cpp/include/lob/*.hpp cpp/src/*.cpp cpp/tests/*.cpp cpp/tools/*.cpp cpp/bench/*.cpp cpp/bench/*.hpp
-      - name: Configure
+        run: clang-format --dry-run --Werror cpp/include/lob/*.hpp cpp/src/*.cpp cpp/tests/*.cpp cpp/tests/*.hpp cpp/tools/*.cpp cpp/bench/*.cpp cpp/bench/*.hpp
+      - name: Configure (Release)
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
       - name: Build
         run: cmake --build build
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
+  sanitizers:
+    name: C++ tests under ASan + UBSan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Configure (Debug, sanitizers on)
+        run: >
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DLOB_BUILD_BENCHMARKS=OFF
+          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
   python:
-    name: Python tests
+    name: Python lint and tests
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Lint (ruff)
+        run: pip install ruff && ruff check python scripts && ruff format --check python scripts
       - name: Build and install package (compiles the C++ extension)
         run: pip install ".[dev]"
       - name: Test
