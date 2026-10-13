@@ -1,5 +1,8 @@
 #pragma once
 
+// Basic types shared by the order book and matching engine: ids, prices, quantities, sides,
+// and the small structs used to report a price level or a single order.
+
 #include <cstdint>
 
 namespace lob {
