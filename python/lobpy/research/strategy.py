@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..backtest.strategies import _HoldThenExit, _ioc_at_touch
-from ..backtest.types import BUY, SELL, Account, BookSnapshot, Fill
+from ..backtest.types import BUY, SELL, Account, Action, BookSnapshot, Fill
 
 
 class PredictionTaker(_HoldThenExit):
@@ -21,9 +21,16 @@ class PredictionTaker(_HoldThenExit):
     wide, so it never pays a wide spread to act on a prediction.
     """
 
-    def __init__(self, timestamps: np.ndarray, p_up: np.ndarray, p_down: np.ndarray,
-                 threshold: float = 0.6, quantity: int = 100, hold_ns: int = 10**9,
-                 max_spread: int | None = None):  # fmt: skip
+    def __init__(
+        self,
+        timestamps: np.ndarray,
+        p_up: np.ndarray,
+        p_down: np.ndarray,
+        threshold: float = 0.6,
+        quantity: int = 100,
+        hold_ns: int = 10**9,
+        max_spread: int | None = None,
+    ) -> None:
         self.timestamps = np.asarray(timestamps)
         self.p_up = np.asarray(p_up)
         self.p_down = np.asarray(p_down)
@@ -39,7 +46,7 @@ class PredictionTaker(_HoldThenExit):
     def on_start(self, account: Account) -> None:
         self.account = account
 
-    def on_book_update(self, book: BookSnapshot):
+    def on_book_update(self, book: BookSnapshot) -> list[Action] | None:
         if self.account.open_orders:
             return None
         actions = self._manage_position(book)

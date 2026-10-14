@@ -4,7 +4,7 @@ usage: python3 scripts/run_research.py <data-dir> <output.json> [importance.png]
 
 Development days are used for walk-forward validation only. The holdout day is used once, at
 the end: models trained on all development days are scored on it and then traded on it in the
-backtester. Results are written as JSON; docs/research.md is written from them.
+backtester. Results are written as JSON; docs/research/tables.md is generated from them.
 """
 
 from __future__ import annotations
@@ -33,7 +33,9 @@ MIDDAY = 12 * HOUR + 45 * MINUTE  # splits each day into am / pm validation bloc
 THRESHOLDS = [0.5, 0.6]
 MODELS = [MajorityBaseline, ImbalanceRule, Logistic, GradientBoosting]
 # Optional cost-aware variant: model and trade only tradeable states (spread <= N ticks).
-MAX_SPREAD_TICKS = float(os.environ["LOB_MAX_SPREAD_TICKS"]) if "LOB_MAX_SPREAD_TICKS" in os.environ else None
+MAX_SPREAD_TICKS = (
+    float(os.environ["LOB_MAX_SPREAD_TICKS"]) if "LOB_MAX_SPREAD_TICKS" in os.environ else None
+)
 
 
 def log(msg: str) -> None:
@@ -66,12 +68,20 @@ def main() -> None:
     log("building features")
     dev = pd.concat([load(data_dir, d, cache_dir) for d in DEV_DAYS], ignore_index=True)
     holdout = load(data_dir, HOLDOUT_DAY, cache_dir)
-    results: dict = {"setup": {
-        "dev_days": DEV_DAYS, "holdout_day": HOLDOUT_DAY, "symbols": SYMBOLS,
-        "interval_ms": INTERVAL // 1_000_000, "window": "09:35-15:55",
-        "dev_rows": len(dev), "holdout_rows": len(holdout), "features": FEATURES,
-        "max_spread_ticks": MAX_SPREAD_TICKS,
-    }, "horizons": {}}  # fmt: skip
+    results: dict = {
+        "setup": {
+            "dev_days": DEV_DAYS,
+            "holdout_day": HOLDOUT_DAY,
+            "symbols": SYMBOLS,
+            "interval_ms": INTERVAL // 1_000_000,
+            "window": "09:35-15:55",
+            "dev_rows": len(dev),
+            "holdout_rows": len(holdout),
+            "features": FEATURES,
+            "max_spread_ticks": MAX_SPREAD_TICKS,
+        },
+        "horizons": {},
+    }
 
     for h in HORIZONS:
         label = f"label_{h // SECOND}s"
@@ -101,11 +111,16 @@ def main() -> None:
                     importances.append(model.importance(FEATURES))
             log(f"{name} fold {i + 1}/{len(folds)} ({fold.test_block}) done")
         res["walk_forward"] = {
-            name_: {k: float(np.mean([f[k] for f in folds_])) for k in ("accuracy", "balanced_accuracy", "log_loss")}
+            name_: {
+                k: float(np.mean([f[k] for f in folds_]))
+                for k in ("accuracy", "balanced_accuracy", "log_loss")
+            }
             for name_, folds_ in per_model.items()
-        }  # fmt: skip
+        }
         res["walk_forward_folds"] = per_model
-        res["importance"] = pd.concat(importances, axis=1).mean(axis=1).sort_values(ascending=False).to_dict()
+        res["importance"] = (
+            pd.concat(importances, axis=1).mean(axis=1).sort_values(ascending=False).to_dict()
+        )
 
         # ---- One look at the holdout day ----
         Xdev, ydev = d[FEATURES], d[label].to_numpy()
@@ -126,15 +141,36 @@ def main() -> None:
             for symbol in SYMBOLS:
                 grid = holdout[holdout["symbol"] == symbol]
                 proba = final_lgbm.predict_proba(grid[FEATURES])
-                feed = EventFeed.from_replayer(replayer, symbol, depth=5, start_ns=START, end_ns=16 * HOUR)
-                strategy = PredictionTaker(grid["timestamp"].to_numpy(), proba[:, 2], proba[:, 0],
-                                           threshold=threshold, quantity=100, hold_ns=h,
-                                           max_spread=None if MAX_SPREAD_TICKS is None
-                                           else int(MAX_SPREAD_TICKS * 100))  # fmt: skip
+                feed = EventFeed.from_replayer(
+                    replayer, symbol, depth=5, start_ns=START, end_ns=16 * HOUR
+                )
+                strategy = PredictionTaker(
+                    grid["timestamp"].to_numpy(),
+                    proba[:, 2],
+                    proba[:, 0],
+                    threshold=threshold,
+                    quantity=100,
+                    hold_ns=h,
+                    max_spread=None if MAX_SPREAD_TICKS is None else int(MAX_SPREAD_TICKS * 100),
+                )
                 m = Backtester(feed, BacktestConfig(latency_ns=100_000)).run(strategy).metrics
-                rows.append({"symbol": symbol, "signals": strategy.signals,
-                             **{k: m[k] for k in ("net_pnl", "signal_pnl", "spread_pnl", "fees",
-                                                  "traded_shares", "fill_rate")}})  # fmt: skip
+                rows.append(
+                    {
+                        "symbol": symbol,
+                        "signals": strategy.signals,
+                        **{
+                            k: m[k]
+                            for k in (
+                                "net_pnl",
+                                "signal_pnl",
+                                "spread_pnl",
+                                "fees",
+                                "traded_shares",
+                                "fill_rate",
+                            )
+                        },
+                    }
+                )
             res["backtest"][str(threshold)] = rows
         log(f"{name} backtests done")
         results["horizons"][name] = res
@@ -160,11 +196,18 @@ def plot_importance(results: dict, path: Path) -> None:
     ax.set_facecolor(surface)
     height = 0.8 / len(horizons)
     y = np.arange(len(order))
-    for i, (h, color) in enumerate(zip(horizons, colors)):
+    for i, (h, color) in enumerate(zip(horizons, colors, strict=False)):
         imp = results["horizons"][h]["importance"]
         # First horizon on top within each group, matching the legend order.
-        ax.barh(y - (i - (len(horizons) - 1) / 2) * height, [imp[f] * 100 for f in order],
-                height=height, color=color, edgecolor=surface, linewidth=1.5, label=f"{h} horizon")  # fmt: skip
+        ax.barh(
+            y - (i - (len(horizons) - 1) / 2) * height,
+            [imp[f] * 100 for f in order],
+            height=height,
+            color=color,
+            edgecolor=surface,
+            linewidth=1.5,
+            label=f"{h} horizon",
+        )
     ax.set_yticks(y, order, color=ink)
     ax.set_xlabel("Share of LightGBM split gain (%), mean over walk-forward folds", color=ink2)
     max_spread = results["setup"].get("max_spread_ticks")

@@ -1,3 +1,6 @@
+// Turns parsed ITCH messages into order book operations, one book per stock. Anything that
+// doesn't apply cleanly (e.g. a cancel for an unknown order) is counted, not fatal.
+
 #include "lob/book_builder.hpp"
 
 #include <utility>

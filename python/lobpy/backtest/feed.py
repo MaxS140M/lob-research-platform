@@ -3,13 +3,26 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
+from typing import TYPE_CHECKING
 
 import numpy as np
 
+if TYPE_CHECKING:
+    from .._lob import Replayer
+
 COLUMNS = (
-    "timestamp", "seq", "kind", "side", "price", "shares", "trade_price", "priority",
-    "old_price", "old_shares", "old_priority",
-)  # fmt: skip
+    "timestamp",
+    "seq",
+    "kind",
+    "side",
+    "price",
+    "shares",
+    "trade_price",
+    "priority",
+    "old_price",
+    "old_shares",
+    "old_priority",
+)
 LEVELS = ("bid_price", "bid_size", "ask_price", "ask_size")
 
 
@@ -21,7 +34,7 @@ class EventFeed:
     depth arrays stay in NumPy and are only read when an order needs more than the top level.
     """
 
-    def __init__(self, columns: Mapping[str, np.ndarray], symbol: str = ""):
+    def __init__(self, columns: Mapping[str, np.ndarray], symbol: str = "") -> None:
         missing = [c for c in (*COLUMNS, *LEVELS) if c not in columns]
         if missing:
             raise ValueError(f"event columns missing: {missing}")
@@ -35,8 +48,14 @@ class EventFeed:
         self.depth = self.columns["bid_price"].shape[1] if n else 0
 
     @classmethod
-    def from_replayer(cls, replayer, symbol: str, depth: int = 5, start_ns: int | None = None,
-                      end_ns: int | None = None) -> EventFeed:  # fmt: skip
+    def from_replayer(
+        cls,
+        replayer: Replayer,
+        symbol: str,
+        depth: int = 5,
+        start_ns: int | None = None,
+        end_ns: int | None = None,
+    ) -> EventFeed:
         return cls(replayer.events(symbol, depth, start_ns=start_ns, end_ns=end_ns), symbol)
 
     def __len__(self) -> int:

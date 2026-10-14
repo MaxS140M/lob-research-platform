@@ -28,8 +28,9 @@ def time_blocks(frame: pd.DataFrame, split_ns: int) -> pd.Series:
     return frame["day"].astype(str) + " " + half
 
 
-def walk_forward(frame: pd.DataFrame, blocks: pd.Series, embargo_ns: int,
-                 min_train_blocks: int = 1) -> list[Fold]:  # fmt: skip
+def walk_forward(
+    frame: pd.DataFrame, blocks: pd.Series, embargo_ns: int, min_train_blocks: int = 1
+) -> list[Fold]:
     """Expanding-window walk-forward folds over ``blocks`` (in time order)."""
     order = list(dict.fromkeys(blocks))  # blocks in first-appearance (time) order
     if order != sorted(order):

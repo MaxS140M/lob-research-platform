@@ -13,6 +13,7 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <cstdlib>
 #include <vector>
 
 namespace lob::bench {
@@ -31,9 +32,16 @@ inline std::uint64_t tsc_stop() noexcept {
     return t;
 }
 
-// TSC ticks per nanosecond, measured once against steady_clock.
+// TSC ticks per nanosecond, i.e. the TSC frequency in GHz.
+//
+// The TSC runs at a fixed hardware rate, so the best source is that rate itself: set
+// LOB_TSC_GHZ to it (Linux prints it at boot: `dmesg | grep "tsc: Detected"`). Otherwise it is
+// calibrated against steady_clock. That is accurate on bare-metal Linux, but under WSL2 the
+// guest clock is steered by the host's time sync and the calibration drifts by up to ~9%
+// between runs, so the benchmarks in this repo set LOB_TSC_GHZ.
 inline double tsc_ticks_per_ns() {
     static const double ticks = [] {
+        if (const char* ghz = std::getenv("LOB_TSC_GHZ")) return std::strtod(ghz, nullptr);
         const auto t0 = std::chrono::steady_clock::now();
         const std::uint64_t c0 = tsc_start();
         while (std::chrono::steady_clock::now() - t0 < std::chrono::milliseconds(200)) {
@@ -78,6 +86,11 @@ public:
         long double sum = 0;
         for (std::size_t c = 0; c < kBuckets; ++c) sum += static_cast<long double>(c) * counts_[c];
         return static_cast<double>(sum / total_) / tsc_ticks_per_ns();
+    }
+
+    // Number of samples that took exactly `cycles` cycles (the last bucket also holds slower ones).
+    [[nodiscard]] std::uint64_t count_at(std::size_t cycles) const noexcept {
+        return counts_[cycles];
     }
 
     void merge(const LatencyHistogram& other) noexcept {

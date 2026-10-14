@@ -1,3 +1,5 @@
+// Maps a whole file into memory with mmap, so the parser can read it like an array.
+
 #include "lob/mapped_file.hpp"
 
 #include <fcntl.h>

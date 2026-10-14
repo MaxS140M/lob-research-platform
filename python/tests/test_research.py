@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+from test_backtest import make_feed
 
 from lobpy.backtest import BUY, BacktestConfig, Backtester
 from lobpy.research import (
@@ -18,8 +19,6 @@ from lobpy.research import (
 )
 from lobpy.research.features import order_flow_imbalance, trade_flow
 
-from test_backtest import make_feed
-
 INTERVAL = 250_000_000  # 250 ms
 
 
@@ -32,11 +31,13 @@ def random_book(n: int, seed: int):
     ask = (mid_ticks + half_spread)[:, None] + np.arange(5)[None, :]
     ts = np.arange(n) * INTERVAL
     sizes = lambda: rng.integers(1, 10, (n, 5)) * 100  # noqa: E731
-    trades = pd.DataFrame({
-        "timestamp": np.sort(rng.integers(0, n * INTERVAL, 3 * n)),
-        "side": rng.choice([-1, 1], 3 * n),
-        "shares": rng.integers(1, 5, 3 * n) * 100,
-    })  # fmt: skip
+    trades = pd.DataFrame(
+        {
+            "timestamp": np.sort(rng.integers(0, n * INTERVAL, 3 * n)),
+            "side": rng.choice([-1, 1], 3 * n),
+            "shares": rng.integers(1, 5, 3 * n) * 100,
+        }
+    )
     return ts, bid * 100, sizes(), ask * 100, sizes(), trades
 
 
@@ -93,14 +94,19 @@ def test_no_feature_depends_on_data_after_its_timestamp(cut):
 
     _, bp2, bs2, ap2, az2, trades2 = random_book(2_000, seed=99)
     bp, bs, ap, az = (x.copy() for x in (bp, bs, ap, az))
-    bp[cut + 1:], bs[cut + 1:], ap[cut + 1:], az[cut + 1:] = bp2[cut + 1:], bs2[cut + 1:], ap2[cut + 1:], az2[cut + 1:]
+    bp[cut + 1 :], bs[cut + 1 :], ap[cut + 1 :], az[cut + 1 :] = (
+        bp2[cut + 1 :],
+        bs2[cut + 1 :],
+        ap2[cut + 1 :],
+        az2[cut + 1 :],
+    )
     future = trades2[trades2["timestamp"] > ts[cut]]
     trades = pd.concat([trades[trades["timestamp"] <= ts[cut]], future]).sort_values("timestamp")
     after = book_features(ts, bp, bs, ap, az, trades, INTERVAL)
 
     pd.testing.assert_frame_equal(before.iloc[: cut + 1], after.iloc[: cut + 1])
     # Sanity: the scramble did change later rows, so the test has teeth.
-    assert not before.iloc[cut + 1:].equals(after.iloc[cut + 1:])
+    assert not before.iloc[cut + 1 :].equals(after.iloc[cut + 1 :])
 
 
 def test_labels_do_look_ahead_and_are_kept_separate():
@@ -119,8 +125,13 @@ def test_walk_forward_is_time_ordered_with_an_embargo():
     blocks = time_blocks(frame, split_ns=500)
     folds = walk_forward(frame, blocks, embargo_ns=50)
 
-    assert [f.test_block for f in folds] == ["20190730 pm", "20190830 am", "20190830 pm",
-                                             "20191030 am", "20191030 pm"]  # fmt: skip
+    assert [f.test_block for f in folds] == [
+        "20190730 pm",
+        "20190830 am",
+        "20190830 pm",
+        "20191030 am",
+        "20191030 pm",
+    ]
     for fold in folds:
         assert len(np.intersect1d(fold.train, fold.test)) == 0
         assert fold.train.max() < fold.test.min()  # training is strictly earlier
@@ -179,7 +190,7 @@ def test_models_beat_the_majority_baseline_on_a_planted_signal():
         assert results[name]["balanced_accuracy"] > base["balanced_accuracy"] + 0.2, name
 
 
-# ---- Trading predictions --------------------------------------------------------------------------
+# ---- Trading predictions ---------------------------------------------------------------------
 
 
 def test_prediction_strategy_never_uses_a_later_prediction():
@@ -189,8 +200,9 @@ def test_prediction_strategy_never_uses_a_later_prediction():
         {"t": 20, "bids": [(99, 1_000)], "asks": [(101, 1_000)]},
     ]
     # One prediction, stamped t = 10: strongly up. The event at t = 5 must not act on it.
-    strategy = PredictionTaker(np.array([10]), np.array([0.9]), np.array([0.05]),
-                               threshold=0.6, hold_ns=10**12)  # fmt: skip
+    strategy = PredictionTaker(
+        np.array([10]), np.array([0.9]), np.array([0.05]), threshold=0.6, hold_ns=10**12
+    )
     cfg = BacktestConfig(latency_ns=1, flatten_at_ns=None, depth=2)
     result = Backtester(make_feed(rows), cfg).run(strategy)
     fills = result.fills
@@ -204,7 +216,15 @@ def test_prediction_strategy_skips_wide_spreads():
         {"t": 20, "bids": [(99, 1_000)], "asks": [(101, 1_000)]},  # 2 units: fine
         {"t": 30, "bids": [(99, 1_000)], "asks": [(101, 1_000)]},
     ]
-    strategy = PredictionTaker(np.array([0]), np.array([0.9]), np.array([0.05]), threshold=0.6,
-                               hold_ns=10**12, max_spread=5)  # fmt: skip
-    result = Backtester(make_feed(rows), BacktestConfig(latency_ns=1, flatten_at_ns=None, depth=2)).run(strategy)
+    strategy = PredictionTaker(
+        np.array([0]),
+        np.array([0.9]),
+        np.array([0.05]),
+        threshold=0.6,
+        hold_ns=10**12,
+        max_spread=5,
+    )
+    result = Backtester(
+        make_feed(rows), BacktestConfig(latency_ns=1, flatten_at_ns=None, depth=2)
+    ).run(strategy)
     assert [t.value for t in result.fills["time"]] == [21]  # entered at t = 20, not t = 10
