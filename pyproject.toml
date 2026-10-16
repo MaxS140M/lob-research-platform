@@ -18,7 +18,8 @@ dependencies = [
 [project.optional-dependencies]
 ml = ["scikit-learn>=1.4", "lightgbm>=4.3"]
 notebook = ["jupyter>=1.0", "matplotlib>=3.8"]
-dev = ["pytest>=8.0", "scikit-learn>=1.4", "lightgbm>=4.3"]
+dashboard = ["streamlit>=1.39", "scikit-learn>=1.4", "lightgbm>=4.3"]
+dev = ["pytest>=8.0", "scikit-learn>=1.4", "lightgbm>=4.3", "streamlit>=1.39"]
 
 [tool.scikit-build]
 minimum-version = "0.10"
@@ -39,7 +40,7 @@ testpaths = ["python/tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-src = ["python", "scripts"]
+src = ["python", "scripts", "dashboard"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "ANN001", "ANN201", "ANN202", "ANN204"]
@@ -48,6 +49,7 @@ select = ["E", "F", "W", "I", "UP", "B", "ANN001", "ANN201", "ANN202", "ANN204"]
 [tool.ruff.lint.per-file-ignores]
 "python/tests/*" = ["ANN"]
 "scripts/*" = ["ANN"]
+"dashboard/*" = ["ANN"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["lobpy"]

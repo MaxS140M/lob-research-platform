@@ -82,6 +82,7 @@ never committed.
 | Result tables from the study | `python3 scripts/research_tables.py docs/research/results.json` |
 | The charts in `docs/images/` | `python3 scripts/make_charts.py data` |
 | Notebook | `pip install ".[notebook]"`, then open `notebooks/01_replay_snapshots.ipynb` |
+| Dashboard | `pip install ".[dashboard]"`, then `LOB_DATA_DIR=data streamlit run dashboard/app.py` |
 
 ## 6. Benchmarks
 
@@ -101,7 +102,29 @@ taskset -c 2 ./build-native/lob_bench --benchmark_filter=Compare \
 explains why it's set by hand. To get the latency histogram used in the charts, run
 `taskset -c 2 ./build-native/latency_histogram data/20190730.BX_ITCH_50 > docs/images/latency_histogram.csv`.
 
-## 7. Code style
+## 7. The dashboard
+
+```bash
+pip install ".[dashboard]"
+LOB_DATA_DIR=data streamlit run dashboard/app.py
+```
+
+Then open <http://localhost:8501>:
+- **Choosing a moment:** pick a day, a stock and a time, and step with the buttons.
+- **The model panel:** it needs the feature cache written by `scripts/run_research.py`, and
+  covers the five research stocks.
+- **Links:** `?day=20200130&symbol=SPY&t=10:00:11` opens a specific moment.
+
+The GIF in the README is a screen recording. To record one automatically instead (headless
+Chromium clicks through the dashboard), run this while the dashboard is running. Note that it
+overwrites `docs/images/dashboard.gif`:
+
+```bash
+pip install playwright pillow && playwright install chromium
+python3 scripts/record_dashboard_gif.py
+```
+
+## 8. Code style
 
 ```bash
 clang-format -i cpp/include/lob/*.hpp cpp/src/*.cpp     # C++
