@@ -55,8 +55,9 @@ if(LOB_BUILD_BENCHMARKS)
   set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
   FetchContent_MakeAvailable(benchmark)
 
-  add_executable(lob_bench cpp/bench/bench_book.cpp)
+  add_executable(lob_bench cpp/bench/bench_book.cpp cpp/bench/bench_compare.cpp)
   target_link_libraries(lob_bench PRIVATE lob benchmark::benchmark)
+  target_include_directories(lob_bench PRIVATE cpp/tests)  # for the frozen v1 reference book
   target_compile_options(lob_bench PRIVATE ${LOB_WARNINGS})
 endif()
 
