@@ -1,6 +1,6 @@
 # Benchmarks
 
-## ITCH 5.0 parser (Phase 1)
+## ITCH 5.0 parser
 
 Full-day parse of a real NASDAQ BX TotalView-ITCH 5.0 file using `itch_stats`.
 
@@ -62,3 +62,5 @@ Warm figures are the median of 5 runs. The run-to-run spread was under 1%.
 cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build build
 ./build/itch_stats data/20190730.BX_ITCH_50
 ```
+
+Decodes a full trading day (28.7M messages) at 160M msgs/s with a determinism checksum.
