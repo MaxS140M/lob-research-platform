@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(lob VERSION 0.3.0 LANGUAGES CXX)
+project(lob VERSION 0.4.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -13,6 +13,7 @@ endif()
 option(LOB_BUILD_TESTS "Build the GoogleTest unit tests" ON)
 option(LOB_BUILD_TOOLS "Build the command-line tools" ON)
 option(LOB_BUILD_BENCHMARKS "Build the Google Benchmark suite" ON)
+option(LOB_BUILD_PYTHON "Build the pybind11 extension module (set by pip install)" OFF)
 option(LOB_NATIVE "Optimise for the build machine's CPU (-march=native); use for benchmarks" OFF)
 
 if(LOB_NATIVE)
@@ -26,6 +27,7 @@ add_library(lob
   cpp/src/book_builder.cpp
   cpp/src/mapped_file.cpp
   cpp/src/order_book.cpp
+  cpp/src/replayer.cpp
 )
 target_include_directories(lob PUBLIC cpp/include)
 target_compile_options(lob PRIVATE ${LOB_WARNINGS})
@@ -80,10 +82,24 @@ if(LOB_BUILD_TESTS)
     cpp/tests/test_order_book.cpp
     cpp/tests/test_order_book_differential.cpp
     cpp/tests/test_order_index.cpp
+    cpp/tests/test_replayer.cpp
   )
   target_link_libraries(lob_tests PRIVATE lob GTest::gtest_main)
+  target_compile_definitions(lob_tests PRIVATE LOB_TESTDATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/testdata")
   target_compile_options(lob_tests PRIVATE ${LOB_WARNINGS})
 
   include(GoogleTest)
   gtest_discover_tests(lob_tests)
+endif()
+
+# ---- Python extension ------------------------------------------------------
+# Built by pip through scikit-build-core (see pyproject.toml), which provides pybind11.
+if(LOB_BUILD_PYTHON)
+  set_target_properties(lob PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  find_package(Python 3.11 REQUIRED COMPONENTS Interpreter Development.Module)
+  find_package(pybind11 CONFIG REQUIRED)
+  pybind11_add_module(_lob cpp/src/bindings.cpp)
+  target_link_libraries(_lob PRIVATE lob)
+  target_compile_options(_lob PRIVATE ${LOB_WARNINGS})
+  install(TARGETS _lob DESTINATION lobpy)
 endif()
