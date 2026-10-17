@@ -5,13 +5,18 @@
 // The book only stores resting orders; it does not match. Matching is done by
 // MatchingEngine on top of the primitives here (front / fill_front), and ITCH replay drives
 // the book directly, because the exchange has already done the matching.
+//
+// Price levels live in one flat vector per side, sorted so the best price is at the back.
+// Top of book is back(), and level searches start there because almost all activity is within
+// a few levels of the touch (see docs/benchmarks.md for the version history).
 
+#include <algorithm>
 #include <cstddef>
 #include <iterator>
 #include <list>
-#include <map>
 #include <optional>
 #include <unordered_map>
+#include <vector>
 
 #include "lob/types.hpp"
 
@@ -64,11 +69,12 @@ private:
         OwnerId owner;
     };
     struct Level {
+        Price price;
         Quantity quantity = 0;
         std::list<Order> orders;  // front is oldest
     };
-    // Both sides are sorted ascending; the best bid is the last element, the best ask the first.
-    using Levels = std::map<Price, Level>;
+    // Sorted worst to best: bids ascending, asks descending, so the best level is back().
+    using Levels = std::vector<Level>;
     struct Locator {
         Side side;
         Price price;
@@ -78,12 +84,14 @@ private:
     Levels& levels(Side side) noexcept { return side == Side::kBuy ? bids_ : asks_; }
     const Levels& levels(Side side) const noexcept { return side == Side::kBuy ? bids_ : asks_; }
 
-    static Levels::iterator best_level(Levels& levels, Side side) {
-        return side == Side::kBuy ? std::prev(levels.end()) : levels.begin();
+    // True if `a` is a worse price than `b` on `side` (further from the touch).
+    static bool worse(Side side, Price a, Price b) noexcept {
+        return side == Side::kBuy ? a < b : a > b;
     }
-    static Levels::const_iterator best_level(const Levels& levels, Side side) {
-        return side == Side::kBuy ? std::prev(levels.end()) : levels.begin();
-    }
+
+    // Index of the first level whose price is not worse than `price`: the level at `price` if
+    // there is one, otherwise where it would be inserted.
+    static std::size_t lower_level(const Levels& levels, Side side, Price price) noexcept;
 
     void erase(std::unordered_map<OrderId, Locator>::iterator entry);
 
@@ -95,19 +103,10 @@ private:
 template <class F>
 void OrderBook::for_each_level(Side side, std::size_t max_levels, F&& f) const {
     const Levels& book = levels(side);
-    std::size_t n = 0;
-    const auto emit = [&](const auto& entry) {
-        f(LevelInfo{entry.first, entry.second.quantity,
-                    static_cast<std::uint32_t>(entry.second.orders.size())});
-        return ++n < max_levels;
-    };
-    if (max_levels == 0) return;
-    if (side == Side::kBuy) {
-        for (auto it = book.rbegin(); it != book.rend(); ++it)
-            if (!emit(*it)) return;
-    } else {
-        for (auto it = book.begin(); it != book.end(); ++it)
-            if (!emit(*it)) return;
+    const std::size_t n = std::min(max_levels, book.size());
+    for (std::size_t i = 0; i < n; ++i) {
+        const Level& level = book[book.size() - 1 - i];
+        f(LevelInfo{level.price, level.quantity, static_cast<std::uint32_t>(level.orders.size())});
     }
 }
 

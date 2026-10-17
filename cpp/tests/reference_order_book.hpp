@@ -21,7 +21,6 @@
 
 namespace lob::reference {
 
-
 class OrderBook {
 public:
     // Adds a resting order at the back of its price level's queue.
@@ -116,9 +115,7 @@ void OrderBook::for_each_level(Side side, std::size_t max_levels, F&& f) const {
     }
 }
 
-
 // ---- Implementation ----
-
 
 inline bool OrderBook::add(OrderId id, Side side, Price price, Quantity quantity, OwnerId owner) {
     if (quantity == 0) return false;

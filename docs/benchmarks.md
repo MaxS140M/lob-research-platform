@@ -102,18 +102,33 @@ Synthetic workloads, latency p50 / p99 / p99.9 in ns:
 | Version | Change | Add | Cancel | Match | Full-day replay |
 |---|---|---:|---:|---:|---:|
 | v1 | `std::map` levels, `std::list` per level, `std::unordered_map` index | 55 / 83 / 101 | 64 / 92 / 119 | 83 / 129 / 165 | 12.2 M msg/s (82 ns/msg) |
+| v2 | Flat sorted vector of levels per side, best at the back | 55 / 83 / 110 | 64 / 101 / 129 | 73 / 138 / 174 | 14.6 M msg/s (69 ns/msg) |
 
 Real ITCH data (every book update in the BX day), latency p50 / p99 / p99.9 in ns:
 
 | Version | Add | Execute | Cancel | Delete | Replace |
 |---|---:|---:|---:|---:|---:|
 | v1 | 83 / 220 / 432 | 110 / 257 / 514 | 73 / 193 / 358 | 110 / 257 / 496 | 147 / 303 / 551 |
+| v2 | 64 / 220 / 450 | 83 / 230 / 496 | 55 / 165 / 349 | 92 / 230 / 478 | 119 / 276 / 523 |
 
 Raw Google Benchmark output for each version is in [docs/bench/](bench/).
 
 **Correctness check for every version:** `book_replay` on the BX day must report 0 anomalies,
 no locked or crossed books, and the same top-of-book digest after every one of the 28.7M
 messages. For v1 that digest is `da514e7cf954bd6a`.
+
+### What each version changed
+
+**v2: flat price levels.** Each side's levels are kept in one sorted `std::vector`, ordered
+worst to best, so the best level is `back()`. Finding a level scans back from the touch and
+switches to binary search after 16 steps, so a deep book stays O(log n).
+
+- **Real data:** clear gains. Add p50 dropped from 83 to 64 ns, execute from 110 to 83 ns,
+  and full-day throughput rose 20%. Real books are shallow and most updates are within a
+  few levels of the touch.
+- **Synthetic add / cancel:** flat. That workload picks one of 50 levels uniformly at random,
+  which is the worst case for a scan from the touch. Most of each operation's cost is still
+  the `malloc` for the list node and the `unordered_map` lookup.
 
 ### Where v1 spends its time
 
