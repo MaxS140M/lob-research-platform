@@ -11,8 +11,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install Ninja
-        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Install tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang-format
+      - name: Check formatting
+        run: clang-format --dry-run --Werror cpp/include/lob/*.hpp cpp/src/*.cpp cpp/tests/*.cpp cpp/tools/*.cpp
       - name: Configure
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
       - name: Build
