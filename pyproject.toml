@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["scikit-build-core>=0.10", "pybind11>=2.12"]
+build-backend = "scikit_build_core.build"
 
 [project]
 name = "lobpy"
-version = "0.3.0"
+version = "0.4.0"
 description = "Python research layer for the lob C++ order book engine: backtester, features and models."
 readme = "README.md"
 license = { text = "MIT" }
@@ -17,10 +17,21 @@ dependencies = [
 
 [project.optional-dependencies]
 ml = ["scikit-learn>=1.4", "lightgbm>=4.3"]
+notebook = ["jupyter>=1.0", "matplotlib>=3.8"]
 dev = ["pytest>=8.0"]
 
-[tool.setuptools.packages.find]
-where = ["python"]
+[tool.scikit-build]
+minimum-version = "0.10"
+cmake.version = ">=3.25"
+cmake.build-type = "Release"
+wheel.packages = ["python/lobpy"]
+
+# pip builds only the library and the extension module, not the tests, tools or benchmarks.
+[tool.scikit-build.cmake.define]
+LOB_BUILD_PYTHON = "ON"
+LOB_BUILD_TESTS = "OFF"
+LOB_BUILD_TOOLS = "OFF"
+LOB_BUILD_BENCHMARKS = "OFF"
 
 [tool.pytest.ini_options]
 testpaths = ["python/tests"]
