@@ -5,11 +5,10 @@
 
 namespace lob {
 
-// Inserting or erasing a level moves the levels after it. std::list keeps its nodes (and so
-// the iterators held in the index) valid across a move, as long as the move cannot throw and
-// fall back to a copy.
-static_assert(std::is_nothrow_move_constructible_v<std::list<int>>);
-static_assert(std::is_nothrow_move_assignable_v<std::list<int>>);
+OrderBook::OrderBook(std::size_t expected_orders) {
+    pool_.reserve(expected_orders);
+    index_.reserve(expected_orders);
+}
 
 std::size_t OrderBook::lower_level(const Levels& levels, Side side, Price price) noexcept {
     // Linear scan back from the touch, where nearly all activity is; fall back to binary
@@ -26,6 +25,16 @@ std::size_t OrderBook::lower_level(const Levels& levels, Side side, Price price)
     return static_cast<std::size_t>(it - levels.begin());
 }
 
+OrderBook::NodeIndex OrderBook::allocate() {
+    if (free_head_ != kNull) {
+        const NodeIndex n = free_head_;
+        free_head_ = pool_[n].next;
+        return n;
+    }
+    pool_.emplace_back();
+    return static_cast<NodeIndex>(pool_.size() - 1);
+}
+
 bool OrderBook::add(OrderId id, Side side, Price price, Quantity quantity, OwnerId owner) {
     if (quantity == 0) return false;
     const auto [entry, inserted] = index_.try_emplace(id);
@@ -34,12 +43,22 @@ bool OrderBook::add(OrderId id, Side side, Price price, Quantity quantity, Owner
     Levels& book = levels(side);
     const std::size_t i = lower_level(book, side, price);
     if (i == book.size() || book[i].price != price) {
-        book.insert(book.begin() + static_cast<std::ptrdiff_t>(i), Level{price, 0, {}});
+        book.insert(book.begin() + static_cast<std::ptrdiff_t>(i),
+                    Level{price, 0, 0, kNull, kNull});
     }
     Level& level = book[i];
+
+    const NodeIndex n = allocate();
+    pool_[n] = Node{id, quantity, owner, price, level.tail, kNull, side};
+    if (level.tail != kNull) {
+        pool_[level.tail].next = n;
+    } else {
+        level.head = n;
+    }
+    level.tail = n;
     level.quantity += quantity;
-    level.orders.push_back(Order{id, quantity, owner});
-    entry->second = Locator{side, price, std::prev(level.orders.end())};
+    ++level.count;
+    entry->second = n;
     return true;
 }
 
@@ -47,22 +66,22 @@ Quantity OrderBook::reduce(OrderId id, Quantity quantity) {
     const auto entry = index_.find(id);
     if (entry == index_.end()) return 0;
 
-    Order& order = *entry->second.it;
-    if (quantity >= order.quantity) {
-        const Quantity removed = order.quantity;
-        erase(entry);
+    Node& node = pool_[entry->second];
+    if (quantity >= node.quantity) {
+        const Quantity removed = node.quantity;
+        erase(entry->second);
         return removed;
     }
-    order.quantity -= quantity;
-    Levels& book = levels(entry->second.side);
-    book[lower_level(book, entry->second.side, entry->second.price)].quantity -= quantity;
+    node.quantity -= quantity;
+    Levels& book = levels(node.side);
+    book[lower_level(book, node.side, node.price)].quantity -= quantity;
     return quantity;
 }
 
 bool OrderBook::remove(OrderId id) {
     const auto entry = index_.find(id);
     if (entry == index_.end()) return false;
-    erase(entry);
+    erase(entry->second);
     return true;
 }
 
@@ -72,54 +91,67 @@ bool OrderBook::replace(OrderId old_id, OrderId new_id, Price price, Quantity qu
     if (entry == index_.end()) return false;
     if (new_id != old_id && index_.contains(new_id)) return false;
 
-    const Side side = entry->second.side;
-    const OwnerId owner = entry->second.it->owner;
-    erase(entry);
+    const Node& node = pool_[entry->second];
+    const Side side = node.side;
+    const OwnerId owner = node.owner;
+    erase(entry->second);
     return add(new_id, side, price, quantity, owner);
 }
 
 std::optional<OrderInfo> OrderBook::find(OrderId id) const {
     const auto entry = index_.find(id);
     if (entry == index_.end()) return std::nullopt;
-    const Locator& loc = entry->second;
-    return OrderInfo{id, loc.side, loc.price, loc.it->quantity, loc.it->owner};
+    const Node& node = pool_[entry->second];
+    return OrderInfo{id, node.side, node.price, node.quantity, node.owner};
 }
 
 std::optional<LevelInfo> OrderBook::best(Side side) const {
     const Levels& book = levels(side);
     if (book.empty()) return std::nullopt;
     const Level& level = book.back();
-    return LevelInfo{level.price, level.quantity, static_cast<std::uint32_t>(level.orders.size())};
+    return LevelInfo{level.price, level.quantity, level.count};
 }
 
 std::optional<OrderInfo> OrderBook::front(Side side) const {
     const Levels& book = levels(side);
     if (book.empty()) return std::nullopt;
-    const Level& level = book.back();
-    const Order& order = level.orders.front();
-    return OrderInfo{order.id, side, level.price, order.quantity, order.owner};
+    const Node& node = pool_[book.back().head];
+    return OrderInfo{node.id, side, node.price, node.quantity, node.owner};
 }
 
 void OrderBook::fill_front(Side side, Quantity quantity) {
     Level& level = levels(side).back();
-    Order& order = level.orders.front();
-    if (quantity >= order.quantity) {
-        erase(index_.find(order.id));
+    Node& node = pool_[level.head];
+    if (quantity >= node.quantity) {
+        erase(level.head);
         return;
     }
-    order.quantity -= quantity;
+    node.quantity -= quantity;
     level.quantity -= quantity;
 }
 
-void OrderBook::erase(std::unordered_map<OrderId, Locator>::iterator entry) {
-    const Locator& loc = entry->second;
-    Levels& book = levels(loc.side);
-    const std::size_t i = lower_level(book, loc.side, loc.price);
+void OrderBook::erase(NodeIndex n) {
+    Node& node = pool_[n];
+    Levels& book = levels(node.side);
+    const std::size_t i = lower_level(book, node.side, node.price);
     Level& level = book[i];
-    level.quantity -= loc.it->quantity;
-    level.orders.erase(loc.it);
-    if (level.orders.empty()) book.erase(book.begin() + static_cast<std::ptrdiff_t>(i));
-    index_.erase(entry);
+
+    if (node.prev != kNull) {
+        pool_[node.prev].next = node.next;
+    } else {
+        level.head = node.next;
+    }
+    if (node.next != kNull) {
+        pool_[node.next].prev = node.prev;
+    } else {
+        level.tail = node.prev;
+    }
+    level.quantity -= node.quantity;
+    if (--level.count == 0) book.erase(book.begin() + static_cast<std::ptrdiff_t>(i));
+
+    index_.erase(node.id);
+    node.next = free_head_;
+    free_head_ = n;
 }
 
 }  // namespace lob
