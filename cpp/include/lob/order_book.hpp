@@ -13,14 +13,15 @@
 // - Orders live in a pool (one contiguous vector with a free list), so steady-state adds do
 //   not allocate. Each level's FIFO queue is an intrusive doubly linked list threaded through
 //   the pool by 32-bit indices.
+// - Order ids map to pool slots through an open-addressing hash table (OrderIndex).
 
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
-#include <unordered_map>
 #include <vector>
 
+#include "lob/order_index.hpp"
 #include "lob/types.hpp"
 
 namespace lob {
@@ -73,6 +74,7 @@ public:
 private:
     using NodeIndex = std::uint32_t;
     static constexpr NodeIndex kNull = UINT32_MAX;
+    static_assert(kNull == OrderIndex::kMissing);
 
     // One resting order, linked into its level's queue (front is oldest).
     struct Node {
@@ -113,7 +115,7 @@ private:
     Levels asks_;
     std::vector<Node> pool_;
     NodeIndex free_head_ = kNull;
-    std::unordered_map<OrderId, NodeIndex> index_;
+    OrderIndex index_;
 };
 
 template <class F>
