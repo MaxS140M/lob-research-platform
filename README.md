@@ -6,6 +6,10 @@ Python bindings, an event-driven backtester and a machine-learning order-flow si
 [![CI](https://github.com/MaxS140M/lob-research-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/MaxS140M/lob-research-platform/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
+![Order book explorer dashboard](docs/images/dashboard.gif)
+
+*The [dashboard](#explore-the-data): pick any stock and any second of a real NASDAQ trading day, and see the order book rebuilt by the C++ engine, the price and trades around that moment, and the model's prediction for the next 5 seconds.*
+
 ## Highlights
 
 - **Fast:** replays a full trading day (28.7M messages, 8,850 stocks) at **28M messages/sec**
@@ -13,8 +17,8 @@ Python bindings, an event-driven backtester and a machine-learning order-flow si
 - **Optimised step by step:** p99 latency to add an order fell from **311 ns to 160 ns**, and
   replay got **2.5× faster** than the first version, through cache-friendly data structures
   and a preallocated order pool. Each step was measured.
-- **Correct:** five real trading days (175M messages) rebuilt with zero errors. 134 tests (91 C++,
-  43 Python) run in CI, including under AddressSanitizer and UndefinedBehaviorSanitizer.
+- **Correct:** five real trading days (175M messages) rebuilt with zero errors. 136 tests (91 C++,
+  45 Python) run in CI, including under AddressSanitizer and UndefinedBehaviorSanitizer.
 - **Honest research:** a walk-forward validated LightGBM model predicts the next price move
   better than every baseline on an unseen day, and the backtest shows exactly why that edge
   disappears once trading costs are paid.
@@ -28,6 +32,7 @@ flowchart LR
     R -- pybind11, zero-copy --> PY[Python: lobpy]
     PY --> BT[Backtester]
     PY --> ML[ML research]
+    PY --> D[Dashboard]
 ```
 
 C++ does the fast work: parsing, order books and matching. Python does the research:
@@ -80,6 +85,19 @@ print(lobpy.snapshots_frame(r.snapshots(interval_ns=1_000_000_000, depth=2), r.s
 
 To download real NASDAQ data and reproduce every result, see
 [docs/getting-started.md](docs/getting-started.md).
+
+### Explore the data
+
+An interactive dashboard: pick a day, a stock and a second of the trading day, and see the
+top 10 price levels, recent trades, and the model's prediction for the next 5 seconds.
+
+```bash
+pip install ".[dashboard]"
+LOB_DATA_DIR=data streamlit run dashboard/app.py    # then open http://localhost:8501
+```
+
+It works on the sample file straight away. With the real data downloaded, links like
+`http://localhost:8501/?day=20200130&symbol=SPY&t=10:00:11` open a specific moment.
 
 ## Documentation
 
