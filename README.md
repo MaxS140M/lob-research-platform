@@ -9,16 +9,31 @@ A small version of the research stack a trading firm runs internally. A fast C++
 replays a full day of NASDAQ TotalView-ITCH 5.0 data and rebuilds the order book. A Python
 layer drives that engine to backtest an ML short-horizon price signal.
 
-> **Status:** in development. The ITCH 5.0 parser is complete; the order book, Python bindings,
-> backtester and ML signal are in progress. See [CHANGELOG.md](CHANGELOG.md) for releases.
+> **Status:** in development. The ITCH 5.0 parser, order book and matching engine are complete;
+> the Python bindings, backtester and ML signal are in progress. See [CHANGELOG.md](CHANGELOG.md)
+> for releases.
 
 ## Highlights
 
-- **ITCH 5.0 parser:** parses a full NASDAQ BX day (28.7M messages, 837 MB) in **0.18 s
-  with full field decoding**, which is 6.3 ns and about 160M messages per second. The file
-  is memory-mapped and read without copying. Callbacks are resolved at compile time, so
-  there are no virtual calls and nothing is allocated per message. See
-  [docs/benchmarks.md](docs/benchmarks.md).
+- **Order book replay:** rebuilds every book (8,850 instruments) from a full NASDAQ BX day at
+  **26–30 M messages/s**, **2.4× faster** than the `std::map` / `std::list` /
+  `std::unordered_map` baseline measured in the same run. On real data, a book update takes
+  about **50 ns at p50 and 120 ns at p99**.
+- **Correct on real data:** 0 anomalies and no locked or crossed books across 28.7M
+  messages. Top of book at the close matches that day's real prices. Every optimisation
+  reproduces the baseline's top-of-book digest exactly.
+- **Optimised one change at a time**, each step profiled with `perf` and benchmarked:
+  - **v2:** flat sorted price-level vectors.
+  - **v3:** an order pool with intrusive queues.
+  - **v4:** an open-addressing order index.
+- **Matching engine:** price-time priority with limit, market, IOC and cancel orders, fill
+  events and self-trade prevention. It's checked against a brute-force model over 100,000
+  random orders.
+- **ITCH 5.0 parser:** parses the full day (837 MB) in **0.18 s with full field decoding**,
+  6.3 ns per message. The file is memory-mapped and read without copying.
+- **Benchmark method:** latency measured per operation with `rdtsc` (p50 / p99 / p99.9),
+  pinned to one core, median of 5 repetitions. Timer overhead, timer resolution and noise
+  are all reported. See [docs/benchmarks.md](docs/benchmarks.md).
 
 ## Repository layout
 
@@ -38,7 +53,7 @@ docs/            architecture, write-up, benchmark charts
 
 ## Building
 
-Requires a C++20 compiler (GCC 12+ or Clang 15+), CMake 3.20+ and Ninja. Linux or WSL2 is
+Requires a C++20 compiler (GCC 12+ or Clang 15+), CMake 3.25+ and Ninja. Linux or WSL2 is
 recommended.
 
 ```bash
@@ -74,6 +89,34 @@ struct MyHandler {
 lob::MappedFile file("data/20190730.BX_ITCH_50");
 MyHandler handler;
 auto result = lob::itch::parse(file.bytes(), handler);
+```
+
+Rebuild every order book for the day and check it (anomalies, locked or crossed books,
+top-of-book digest, top of book at the close):
+
+```bash
+./build/book_replay data/20190730.BX_ITCH_50
+```
+
+Run your own orders through the matching engine:
+
+```cpp
+#include "lob/matching_engine.hpp"
+
+lob::MatchingEngine engine;
+engine.submit({1, lob::Side::kSell, lob::OrderType::kLimit, 1'000'000, 100});  // $100.00
+auto result = engine.submit({2, lob::Side::kBuy, lob::OrderType::kImmediateOrCancel,
+                             1'000'100, 150},
+                            [](const lob::Fill& f) { /* price, quantity, both ids */ });
+// result.filled == 100, result.cancelled == 50
+```
+
+Benchmarks (see [docs/benchmarks.md](docs/benchmarks.md) for the full method):
+
+```bash
+cmake -S . -B build-native -G Ninja -DCMAKE_BUILD_TYPE=Release -DLOB_NATIVE=ON
+cmake --build build-native
+LOB_ITCH_FILE=data/20190730.BX_ITCH_50 taskset -c 2 ./build-native/lob_bench
 ```
 
 ## Python package
