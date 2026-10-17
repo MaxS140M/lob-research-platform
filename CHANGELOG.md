@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-17
+
+Python bindings.
+
+### Added
+
+- `lobpy.Replayer`, pybind11 bindings to a new C++ `lob::Replayer` that replays an ITCH file
+  for chosen symbols. ([#9])
+  - `snapshots(interval_ns, depth, start_ns, end_ns)` samples the top N levels on a fixed
+    time grid.
+  - `trades()` returns every execution with its aggressor side, match number and kind.
+  - Results are dicts of **zero-copy NumPy arrays**: C++ fills preallocated buffers, and a
+    capsule hands their ownership to NumPy.
+  - The GIL is released during the replay.
+  - Requests whose output would exceed 4 GiB are rejected with a clear error.
+- `lobpy.snapshots_frame` and `lobpy.trades_frame`, which convert results to pandas
+  DataFrames with dollar prices, mid and spread. ([#9])
+- `testdata/sample.itch`, a hand-built ITCH day with documented expected books and trades,
+  plus its generator `scripts/make_sample_itch.py`. The C++ and Python tests assert the same
+  values against it. ([#9])
+- Notebook `notebooks/01_replay_snapshots.ipynb`. It replays the BX day from Python, charts
+  SPY's mid and spread, and previews the order book imbalance signal. ([#9])
+
+### Changed
+
+- The Python package now builds with scikit-build-core. `pip install .` compiles the C++
+  engine and the extension through the existing CMake file, with tests, tools and benchmarks
+  turned off. ([#9])
+
 ## [0.3.0] - 2026-10-17
 
 Order book, matching engine and benchmarks.
@@ -99,7 +128,8 @@ Project skeleton, build and CI.
 - `lobpy` Python package with pytest. ([#1])
 - GitHub Actions CI running the C++ and Python test suites. ([#1])
 
-[Unreleased]: https://github.com/MaxS140M/lob-research-platform/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/MaxS140M/lob-research-platform/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/MaxS140M/lob-research-platform/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/MaxS140M/lob-research-platform/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/MaxS140M/lob-research-platform/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/MaxS140M/lob-research-platform/releases/tag/v0.1.0
@@ -110,3 +140,4 @@ Project skeleton, build and CI.
 [#6]: https://github.com/MaxS140M/lob-research-platform/pull/6
 [#7]: https://github.com/MaxS140M/lob-research-platform/pull/7
 [#8]: https://github.com/MaxS140M/lob-research-platform/pull/8
+[#9]: https://github.com/MaxS140M/lob-research-platform/pull/9
