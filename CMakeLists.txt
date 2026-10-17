@@ -51,6 +51,7 @@ if(LOB_BUILD_TESTS)
     cpp/tests/test_book_builder.cpp
     cpp/tests/test_itch_parser.cpp
     cpp/tests/test_mapped_file.cpp
+    cpp/tests/test_matching_engine.cpp
     cpp/tests/test_order_book.cpp
   )
   target_link_libraries(lob_tests PRIVATE lob GTest::gtest_main)
