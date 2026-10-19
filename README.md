@@ -9,11 +9,20 @@ A small version of the research stack a trading firm runs internally. A fast C++
 replays a full day of NASDAQ TotalView-ITCH 5.0 data and rebuilds the order book. A Python
 layer drives that engine to backtest an ML short-horizon price signal.
 
-> **Status:** in development. The ITCH 5.0 parser, order book, matching engine, Python bindings
-> and event-driven backtester are complete; the ML signal is in progress. See
-> [CHANGELOG.md](CHANGELOG.md) for releases.
+> **Status:** the ITCH 5.0 parser, order book, matching engine, Python bindings, event-driven
+> backtester and ML signal study are complete. See [CHANGELOG.md](CHANGELOG.md) for releases.
 
 ## Highlights
+
+- **ML signal study:** order book features predict the next mid-price move out of sample.
+  - **Data:** five NASDAQ BX days, 2.3M snapshots.
+  - **Validation:** walk-forward with an embargo, plus one holdout day used once, and a test
+    that proves no feature uses future data.
+  - **Results:** LightGBM beats every baseline on log-loss at 1 s, 5 s and 30 s. Traded
+    through the backtester, though, the edge lives where the spread is widest. A diagnosis
+    and a cost-aware variant show why the signal, though real, doesn't survive costs on
+    this venue.
+  - Write-up: [docs/research.md](docs/research.md).
 
 - **Order book replay:** rebuilds every book (8,850 instruments) from a full NASDAQ BX day at
   **26–30 M messages/s**, **2.4× faster** than the `std::map` / `std::list` /
