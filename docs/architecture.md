@@ -14,6 +14,8 @@ flowchart LR
     PY --> BT[Backtester]
     PY --> ML[ML research]
     ML -- predictions --> BT
+    PY --> D[Dashboard<br/>Streamlit]
+    ML -- predictions --> D
 ```
 
 The C++ side does the heavy, fast work: reading the file, rebuilding the order book and
@@ -34,6 +36,7 @@ pybind11 bindings connect the two, handing data from C++ to NumPy without copyin
 | **Python bindings** | Exposes the Replayer to Python as `lobpy.Replayer` | [bindings.cpp](../cpp/src/bindings.cpp) |
 | **Backtester** | Replays events to a strategy and simulates realistic fills | [python/lobpy/backtest/](../python/lobpy/backtest/) |
 | **Research** | Features, labels, leakage-free validation and models | [python/lobpy/research/](../python/lobpy/research/) |
+| **Dashboard** | A Streamlit app to step through a day and see the book and the model's prediction | [dashboard/app.py](../dashboard/app.py) |
 
 **Tools** (command-line programs in [cpp/tools/](../cpp/tools/)):
 - `itch_stats` counts every message type in a file and times the parser.
@@ -87,7 +90,7 @@ passive orders wait their turn in the queue.
 
 ## How correctness is checked
 
-- **Unit tests:** 91 in C++ (GoogleTest) and 43 in Python (pytest).
+- **Unit tests:** 91 in C++ (GoogleTest) and 45 in Python (pytest), including a test that renders the dashboard.
 - **Differential tests:**
   - The optimised order book is checked against a frozen copy of the simple first version,
     operation by operation.

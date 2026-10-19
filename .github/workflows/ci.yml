@@ -48,7 +48,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Lint (ruff)
-        run: pip install ruff && ruff check python scripts && ruff format --check python scripts
+        run: pip install ruff && ruff check python scripts dashboard && ruff format --check python scripts dashboard
       - name: Build and install package (compiles the C++ extension)
         run: pip install ".[dev]"
       - name: Test
