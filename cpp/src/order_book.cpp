@@ -1,3 +1,8 @@
+// Order book implementation. The interesting parts:
+//   lower_level()  finds a price level, searching back from the best price
+//   add() / erase() link orders into and out of their level's queue (a list threaded through
+//                  the order pool by index), creating or removing levels as needed
+
 #include "lob/order_book.hpp"
 
 #include <algorithm>
