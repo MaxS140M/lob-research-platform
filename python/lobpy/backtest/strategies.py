@@ -7,7 +7,7 @@ taking liquidity and one by providing it, to show what costs and queue position 
 
 from __future__ import annotations
 
-from .types import BUY, SELL, Account, BookSnapshot, Cancel, Fill, LimitOrder, MarketOrder
+from .types import BUY, SELL, Account, Action, BookSnapshot, Cancel, Fill, LimitOrder, MarketOrder
 
 
 class BuyOpenSellClose:
@@ -16,12 +16,12 @@ class BuyOpenSellClose:
     The backtester's forced flat at ``flatten_at_ns`` sells it again.
     """
 
-    def __init__(self, quantity: int = 100, open_ns: int = 0):
+    def __init__(self, quantity: int = 100, open_ns: int = 0) -> None:
         self.quantity = quantity
         self.open_ns = open_ns
         self.sent = False
 
-    def on_book_update(self, book: BookSnapshot):
+    def on_book_update(self, book: BookSnapshot) -> list[Action] | None:
         if not self.sent and book.timestamp >= self.open_ns and book.ask_price:
             self.sent = True
             return [MarketOrder(BUY, self.quantity)]
@@ -43,7 +43,7 @@ class _HoldThenExit:
 
     hold_ns: int
 
-    def _manage_position(self, book: BookSnapshot):
+    def _manage_position(self, book: BookSnapshot) -> list[Action] | None:
         a = self.account
         if not a.position:
             self.entered_at = None
@@ -62,8 +62,13 @@ class ImbalanceTaker(_HoldThenExit):
     """Crosses the spread at the touch (IOC) in the direction of a strong top-of-book
     imbalance, holds for ``hold_ns``, then exits at the touch. One position at a time."""
 
-    def __init__(self, threshold: float = 0.8, quantity: int = 100, hold_ns: int = 10**10,
-                 cooldown_ns: int = 10**9):  # fmt: skip
+    def __init__(
+        self,
+        threshold: float = 0.8,
+        quantity: int = 100,
+        hold_ns: int = 10**10,
+        cooldown_ns: int = 10**9,
+    ) -> None:
         self.threshold = threshold
         self.quantity = quantity
         self.hold_ns = hold_ns
@@ -76,7 +81,7 @@ class ImbalanceTaker(_HoldThenExit):
     def on_start(self, account: Account) -> None:
         self.account = account
 
-    def on_book_update(self, book: BookSnapshot):
+    def on_book_update(self, book: BookSnapshot) -> list[Action] | None:
         if self.account.open_orders:
             return None  # wait for in-flight orders to resolve
         was_exiting = self.exiting
@@ -106,8 +111,13 @@ class ImbalanceMaker(_HoldThenExit):
     selection).
     """
 
-    def __init__(self, threshold: float = 0.8, quantity: int = 100, hold_ns: int = 10**10,
-                 patience_ns: int = 2 * 10**9):  # fmt: skip
+    def __init__(
+        self,
+        threshold: float = 0.8,
+        quantity: int = 100,
+        hold_ns: int = 10**10,
+        patience_ns: int = 2 * 10**9,
+    ) -> None:
         self.threshold = threshold
         self.quantity = quantity
         self.hold_ns = hold_ns
@@ -122,7 +132,7 @@ class ImbalanceMaker(_HoldThenExit):
     def on_start(self, account: Account) -> None:
         self.account = account
 
-    def on_book_update(self, book: BookSnapshot):
+    def on_book_update(self, book: BookSnapshot) -> list[Action] | None:
         a = self.account
         t = book.timestamp
         if self.working is not None:
@@ -142,8 +152,9 @@ class ImbalanceMaker(_HoldThenExit):
         if imbalance is None or abs(imbalance) < self.threshold:
             return None
         side = BUY if imbalance > 0 else SELL
-        self.working = LimitOrder(side, self.quantity,
-                                  book.bid_price if side == BUY else book.ask_price)  # fmt: skip
+        self.working = LimitOrder(
+            side, self.quantity, book.bid_price if side == BUY else book.ask_price
+        )
         self.sent_at = t
         return [self.working]
 

@@ -112,8 +112,19 @@ def cross(ns, locate, shares, symbol, price, match, cross_type) -> bytes:
     )
 
 
-SIZES = {"S": 12, "R": 39, "A": 36, "F": 40, "E": 31, "C": 36, "X": 23, "D": 19,
-         "U": 35, "P": 44, "Q": 40}  # fmt: skip
+SIZES = {
+    "S": 12,
+    "R": 39,
+    "A": 36,
+    "F": 40,
+    "E": 31,
+    "C": 36,
+    "X": 23,
+    "D": 19,
+    "U": 35,
+    "P": 44,
+    "Q": 40,
+}
 
 
 def messages() -> list[bytes]:

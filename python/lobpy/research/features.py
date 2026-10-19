@@ -12,23 +12,27 @@ Prices are integers with 4 implied decimals; one tick is $0.01 = 100 units.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 
+if TYPE_CHECKING:
+    from .._lob import Replayer
+
 TICK = 100  # price units per cent
 
 FEATURES = [
-    "imbalance_l1",       # (bid size - ask size) / (bid size + ask size), top level
-    "imbalance_l5",       # the same over 5 levels, each weighted by 1 / (1 + ticks from mid)
-    "spread_ticks",       # ask - bid, in cents
+    "imbalance_l1",  # (bid size - ask size) / (bid size + ask size), top level
+    "imbalance_l5",  # the same over 5 levels, each weighted by 1 / (1 + ticks from mid)
+    "spread_ticks",  # ask - bid, in cents
     "microprice_offset",  # (microprice - mid) / spread: where size-weighted fair value sits
-    "ofi_1",              # order flow imbalance since the previous snapshot / L1 depth
-    "ofi_1s",             # the same summed over the last second
-    "trade_flow_20",      # (buy - sell initiated volume) / volume, over the last 20 trades
-    "volatility_5s",      # std of mid changes (bps) over the last 5 seconds
-    "return_1s",          # mid change (bps) over the last second
-]  # fmt: skip
+    "ofi_1",  # order flow imbalance since the previous snapshot / L1 depth
+    "ofi_1s",  # the same summed over the last second
+    "trade_flow_20",  # (buy - sell initiated volume) / volume, over the last 20 trades
+    "volatility_5s",  # std of mid changes (bps) over the last 5 seconds
+    "return_1s",  # mid change (bps) over the last second
+]
 
 DOWN, FLAT, UP = 0, 1, 2
 CLASSES = ("down", "flat", "up")
@@ -40,7 +44,9 @@ def mid_price(bid: np.ndarray, ask: np.ndarray) -> np.ndarray:
     return np.where((bid > 0) & (ask > 0), mid, np.nan)
 
 
-def order_flow_imbalance(bid_px, bid_sz, ask_px, ask_sz) -> np.ndarray:
+def order_flow_imbalance(
+    bid_px: np.ndarray, bid_sz: np.ndarray, ask_px: np.ndarray, ask_sz: np.ndarray
+) -> np.ndarray:
     """Cont, Kukanov & Stoikov (2014) order flow imbalance between consecutive snapshots.
 
     Positive when bid-side size grows or ask-side size shrinks (buying pressure). The first
@@ -57,8 +63,13 @@ def order_flow_imbalance(bid_px, bid_sz, ask_px, ask_sz) -> np.ndarray:
     return e
 
 
-def trade_flow(snapshot_ts: np.ndarray, trade_ts: np.ndarray, trade_signed: np.ndarray,
-               trade_volume: np.ndarray, n: int) -> np.ndarray:  # fmt: skip
+def trade_flow(
+    snapshot_ts: np.ndarray,
+    trade_ts: np.ndarray,
+    trade_signed: np.ndarray,
+    trade_volume: np.ndarray,
+    n: int,
+) -> np.ndarray:
     """(buy - sell initiated volume) / volume over the last ``n`` trades at or before each
     snapshot. NaN before the first trade."""
     k = np.searchsorted(trade_ts, snapshot_ts, side="right")  # trades with ts <= t
@@ -77,8 +88,15 @@ def _rolling_sum(x: np.ndarray, window: int) -> np.ndarray:
     return c[idx] - c[np.maximum(idx - window, 0)]
 
 
-def book_features(ts, bid_px, bid_sz, ask_px, ask_sz, trades: pd.DataFrame | None,
-                  interval_ns: int) -> pd.DataFrame:  # fmt: skip
+def book_features(
+    ts: np.ndarray,
+    bid_px: np.ndarray,
+    bid_sz: np.ndarray,
+    ask_px: np.ndarray,
+    ask_sz: np.ndarray,
+    trades: pd.DataFrame | None,
+    interval_ns: int,
+) -> pd.DataFrame:
     """Features for one symbol's snapshots on a regular time grid.
 
     ``bid_px`` etc. are [n, depth] arrays (best level first, 0 when absent). ``trades`` has
@@ -111,27 +129,36 @@ def book_features(ts, bid_px, bid_sz, ask_px, ask_sz, trades: pd.DataFrame | Non
         spread = a1 - b1
         out["spread_ticks"] = np.where(np.isfinite(mid), spread / TICK, np.nan)
         micro = (b1 * as1 + a1 * bs1) / depth1
-        out["microprice_offset"] = np.where(np.isfinite(mid) & (spread > 0),
-                                            (micro - mid) / spread, np.nan)  # fmt: skip
+        out["microprice_offset"] = np.where(
+            np.isfinite(mid) & (spread > 0), (micro - mid) / spread, np.nan
+        )
 
         e = order_flow_imbalance(b1, bs1, a1, as1)
-        mean_depth_1s = _rolling_sum(depth1, steps_1s) / np.minimum(np.arange(1, len(ts) + 1), steps_1s)
+        mean_depth_1s = _rolling_sum(depth1, steps_1s) / np.minimum(
+            np.arange(1, len(ts) + 1), steps_1s
+        )
         out["ofi_1"] = np.where(depth1 > 0, e / depth1, np.nan)
-        out["ofi_1s"] = np.where(mean_depth_1s > 0, _rolling_sum(e, steps_1s) / mean_depth_1s, np.nan)
+        out["ofi_1s"] = np.where(
+            mean_depth_1s > 0, _rolling_sum(e, steps_1s) / mean_depth_1s, np.nan
+        )
 
     if trades is not None and len(trades):
         printable = trades[trades["side"] != 0]
         out["trade_flow_20"] = trade_flow(
-            ts, printable["timestamp"].to_numpy(),
+            ts,
+            printable["timestamp"].to_numpy(),
             (printable["side"] * printable["shares"]).to_numpy(),
-            printable["shares"].to_numpy(), 20,
-        )  # fmt: skip
+            printable["shares"].to_numpy(),
+            20,
+        )
     else:
         out["trade_flow_20"] = np.nan
 
     mid_series = pd.Series(mid)
     change_bps = mid_series.pct_change(fill_method=None) * 1e4
-    out["volatility_5s"] = change_bps.rolling(steps_5s, min_periods=max(2, steps_5s // 4)).std().to_numpy()
+    out["volatility_5s"] = (
+        change_bps.rolling(steps_5s, min_periods=max(2, steps_5s // 4)).std().to_numpy()
+    )
     out["return_1s"] = (mid_series / mid_series.shift(steps_1s) - 1).to_numpy() * 1e4
     return out
 
@@ -149,8 +176,15 @@ def direction_labels(mid: np.ndarray, steps: int) -> np.ndarray:
     return labels
 
 
-def build_day(replayer, symbols: Sequence[str], day: str, interval_ns: int,
-              horizons_ns: Sequence[int], start_ns: int, end_ns: int) -> pd.DataFrame:  # fmt: skip
+def build_day(
+    replayer: Replayer,
+    symbols: Sequence[str],
+    day: str,
+    interval_ns: int,
+    horizons_ns: Sequence[int],
+    start_ns: int,
+    end_ns: int,
+) -> pd.DataFrame:
     """Features and labels for every symbol on one day, sampled every ``interval_ns``."""
     snaps = replayer.snapshots(interval_ns, depth=5, start_ns=start_ns, end_ns=end_ns)
     all_trades = replayer.trades()
@@ -161,10 +195,14 @@ def build_day(replayer, symbols: Sequence[str], day: str, interval_ns: int,
             continue
         rows = snaps["symbol"] == s
         f = book_features(
-            snaps["timestamp"][rows], snaps["bid_price"][rows], snaps["bid_size"][rows],
-            snaps["ask_price"][rows], snaps["ask_size"][rows],
-            trades[trades["symbol"] == s].sort_values("timestamp", kind="stable"), interval_ns,
-        )  # fmt: skip
+            snaps["timestamp"][rows],
+            snaps["bid_price"][rows],
+            snaps["bid_size"][rows],
+            snaps["ask_price"][rows],
+            snaps["ask_size"][rows],
+            trades[trades["symbol"] == s].sort_values("timestamp", kind="stable"),
+            interval_ns,
+        )
         for h in horizons_ns:
             f[f"label_{h // 10**9}s"] = direction_labels(f["mid"].to_numpy(), int(h // interval_ns))
         f.insert(0, "symbol", symbol)

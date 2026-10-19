@@ -1,181 +1,111 @@
-# Event-driven backtester
+# Backtester
 
-`lobpy.backtest` answers one question honestly: *would this strategy have made money on that
-day, after costs?* It replays every book event for a symbol through the C++ engine and lets a
-strategy react to each event, one at a time.
+A backtester answers: *would this strategy have made money on that day, after costs?* This
+one replays every order book event of a day, one at a time, and simulates how your orders
+would really have been filled.
 
-## Design
+## How it works
 
 Four parts, each with one job:
 
-| Part | Code | Job |
-|---|---|---|
-| **Data feed** | [`EventFeed`](../python/lobpy/backtest/feed.py), from `Replayer.events()` in C++ | Every book event for one symbol, in time order, with the book after it |
-| **Strategy** | [`Strategy`](../python/lobpy/backtest/types.py) protocol | Sees one `BookSnapshot` at a time, returns orders and cancels |
-| **Execution simulator** | [`ExecutionSimulator`](../python/lobpy/backtest/execution.py) | Latency, spread crossing, queue position, fees |
-| **Portfolio** | [`Portfolio`](../python/lobpy/backtest/portfolio.py) | Position, cash, PnL, the risk limit |
+| Part | Job |
+|---|---|
+| **Data feed** | Every book event for one stock, in time order, from the C++ engine |
+| **Strategy** | Sees one book update at a time and decides whether to send orders. It never sees the future. |
+| **Execution simulator** | Decides if, when and at what price each order fills |
+| **Portfolio** | Tracks position, cash, profit and loss, and enforces a position limit |
+
+A strategy is any class with two methods:
 
 ```python
-class Strategy(Protocol):
-    def on_book_update(self, book: BookSnapshot) -> list[Order] | None: ...
-    def on_fill(self, fill: Fill) -> None: ...
+class MyStrategy:
+    def on_book_update(self, book):   # called for every event; return a list of orders or None
+        ...
+    def on_fill(self, fill):          # called when one of your orders trades
+        ...
 ```
 
-**Seeing only the past.** A strategy is never given the feed itself. The engine calls it with
-the snapshot of the current event. Orders it sends only meet the book after the configured
-latency, against the book as it stood when they arrived.
-
-**Exact accounting.** Prices stay integers with 4 implied decimals from the ITCH file through
-to PnL, so cash, fees and positions are exact.
+See the [README](../README.md#quick-start) or `scripts/run_backtests.py` for complete examples.
 
 ## How fills are simulated
 
-| Rule | What the simulator does |
+| Effect | What happens |
 |---|---|
-| **Latency** | An order or cancel sent at time *t* reaches the exchange at *t* + latency. It is handled against the book after the last event at or before that time. |
-| **Crossing the spread** | Market orders, and the marketable part of limit orders, walk the opposite side level by level: buys pay the asks, sells receive the bids. Market and IOC remainders are cancelled. |
-| **Queue position** | A passive order joins the **back** of the queue: *ahead* = displayed size at its price on arrival. |
-| **Moving up the queue** | Every event carries the affected order's queue priority from the C++ engine. Only executions, cancels, deletes and replaces of orders that were **already there** reduce *ahead*. Orders that arrive later sit behind. |
-| **Passive fills** | The order fills, at its own price, when: an order **behind** it executes (FIFO means the aggressor reached it first); a hidden order trades at its price with nothing ahead; the market trades **through** its price; or the opposite side reaches its price. |
-| **Fees** | Per share, set separately for taking and providing liquidity. |
-| **Risk limit** | An order is rejected if the position could exceed `max_position` with every open order filled. |
-| **Forced flat** | From 15:55 the backtester cancels everything and sends IOC orders **at the touch**, event after event, until flat. |
+| **Latency** | An order sent at time *t* reaches the exchange at *t* + latency (default 100 µs). It then meets the book as it was at that moment. |
+| **Crossing the spread** | Buying at market pays the ask; selling receives the bid. Big orders walk down through several price levels. |
+| **Queue position** | A resting order joins the back of the queue at its price. It only moves forward when orders that were already ahead of it trade or cancel. |
+| **Passive fills** | A resting order fills when someone trades against its price level after the orders ahead are gone, or when the price moves through it. |
+| **Fees** | $0.003 per share, every fill. This is an assumption, not BX's real fee schedule. |
+| **Risk limit** | Orders that could take the position beyond 1,000 shares are rejected. |
+| **Close-out** | From 15:55 the backtester cancels everything and closes the position, a little at a time, at the best price. |
 
-**Assumptions used for the results below:**
+**Simplifications (all on the cautious side):**
+- **No market impact:** your orders don't change the replayed market.
+- **Hidden orders:** they never let your order jump the queue.
+- **Auctions:** opening and closing auctions never fill your orders.
 
-| Assumption | Value |
+## The results it reports
+
+| Metric | Meaning |
 |---|---|
-| Fees | $0.0030 per share for both taking and providing liquidity |
-| Position limit | 1,000 shares |
-| Forced flat | from 15:55 |
-| Data | NASDAQ BX, 30 July 2019, 09:30–16:00, 5 book levels |
+| **Net PnL** | Profit after everything |
+| **Signal PnL** | Profit from prices moving your way after you traded |
+| **Spread PnL** | What you paid to cross the spread (or earned by waiting for others to trade with you) |
+| **Fees** | Exchange fees paid |
+| **Sharpe** | Return per unit of risk. On one day it's not very meaningful. |
+| **Max drawdown** | Worst fall from a high point |
+| **Fill rate** | Share of submitted shares that actually traded |
+| **Turnover** | Shares traded, relative to the position limit |
 
-The fee is a flat, conservative assumption, not BX's actual schedule. BX is an "inverted"
-venue that pays takers and charges makers, so per-share costs differ by venue and volume
-tier.
+**Net = signal + spread − fees**, always. This split is what explains *why* a strategy made
+or lost money.
 
-**Simplifications, all against the strategy:**
+## Is the backtester itself correct?
 
-- **No market impact:** the strategy's orders are virtual and never enter the replayed
-  book.
-- **Hidden orders:** assumed to have no priority over the strategy's displayed order, so
-  only the trade-through and "nothing ahead" rules can fill against them.
-- **Deep prices:** a price deeper than the visible depth has an unknown queue, so an order
-  there only fills on a trade-through or a cross.
-- **Crosses:** opening and closing crosses never fill strategy orders.
+Every rule has a test with numbers worked out by hand: 19 tests in
+[test_backtest.py](../python/tests/test_backtest.py).
 
-## Testing the backtester itself
+The main end-to-end check is **"buy 100 shares at the open, sell at the close"** on the tiny
+sample file:
 
-[`test_backtest.py`](../python/tests/test_backtest.py) has 19 tests, every expected number
-worked out by hand.
+| | Price | Mid at the time | Cost of the spread | Fee |
+|---|---:|---:|---:|---:|
+| Buy 100 | $10.01 | $10.005 | −$0.50 | $0.30 |
+| Sell 100 | $9.99 | $10.00 | −$1.00 | $0.30 |
 
-**Buy at the open, sell at the close,** on the hand-built
-[`testdata/sample.itch`](../testdata/README.md):
+- **Signal:** the mid fell from $10.005 to $10.00, which on 100 shares is −$0.50.
+- **Net:** −$0.50 signal − $1.50 spread − $0.60 fees = **−$2.60**.
 
-| Fill | Price | Mid at fill | Spread | Signal | Fee |
+The backtester reproduces every number.
+
+## Results on a real day (30 July 2019)
+
+Three simple strategies on SPY. Each runs in about 0.2 seconds for a whole day of about
+200,000 events.
+
+| Strategy | Net PnL | Signal | Spread | Fees | Fill rate |
 |---|---:|---:|---:|---:|---:|
-| Buy 100 at 11 s | $10.01 | $10.005 | −$0.50 | | $0.30 |
-| Sell 100 at the forced flat | $9.99 | $10.00 | −$1.00 | | $0.30 |
-| **Total** | | | **−$1.50** | **−$0.50** | **$0.60** |
+| Buy at the open, sell at the close | $63 | $69 | −$5 | −$1 | 100% |
+| Imbalance taker: cross the spread when buyers or sellers heavily outnumber the other side | −$1,824 | $222 | −$1,759 | −$287 | 89% |
+| Imbalance maker: same signal, but wait in the queue | −$126 | $14 | −$113 | −$27 | 9% |
 
-The signal is the mid moving from $10.005 to $10.00, × 100 shares. Net PnL is −$2.00
-gross − $0.60 fees = **−$2.60**. The backtester reproduces every number exactly.
+All at 100 µs latency. The results at 10 µs and 1 ms are almost identical (see
+[run_backtests.py](../scripts/run_backtests.py)).
 
-The other tests use hand-written event sequences, one per rule:
-
-- **Latency:** 10 ns vs 100 ns latency meet different books.
-- **Spread crossing:** market orders walk the book; marketable limits rest their remainder;
-  IOC cancels it.
-- **Queue position, step by step:** partial cancels and executions ahead move the order up,
-  but cancels behind it don't. An execution behind it fills it, as does a trade-through or
-  the opposite side reaching its price.
-- **Replace:** a replace ahead frees the old place in the queue.
-- **Cancels:** a cancel only works after its own latency.
-- **Fees and rebates:** per share, by liquidity type.
-- **Risk:** the limit counts open orders.
-- **Forced flat:** it never walks a thin book.
-- **PnL identity:** net = signal + spread − fees holds on every run.
-
-## Results on a real day
-
-Run with
-`python3 scripts/run_backtests.py data/20190730.BX_ITCH_50 SPY AAPL`. A full-day backtest
-over ~200k events takes about 0.2 s.
-
-### The strategies
-
-- **Buy open, sell close:** buys 100 shares at the first event after 09:30. The forced flat
-  sells them.
-- **Imbalance taker:** when top-of-book imbalance |(bid − ask)/(bid + ask)| ≥ 0.8, it crosses
-  the spread with an IOC at the touch for 100 shares, in the imbalance's direction. It holds
-  for 10 s, exits with IOCs at the touch, and waits 1 s before trading again.
-- **Imbalance maker:** the same signal, but it joins the queue at the best price on its side.
-  If not filled in 2 s it cancels; once filled it holds for 10 s and exits at the touch.
-
-### SPY (203,736 events)
-
-| Strategy | Latency | Net PnL | Signal | Spread | Fees | Sharpe | Max DD | Fill rate | Turnover |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Buy open, sell close | 10 µs | $63.40 | $68.50 | −$4.50 | −$0.60 | 9.8 | $75.50 | 100% | 0.2× |
-| Buy open, sell close | 100 µs | $63.40 | $68.50 | −$4.50 | −$0.60 | 9.8 | $75.50 | 100% | 0.2× |
-| Buy open, sell close | 1 ms | $63.40 | $68.50 | −$4.50 | −$0.60 | 9.8 | $75.50 | 100% | 0.2× |
-| Imbalance taker | 10 µs | −$1,825.13 | $251.56 | −$1,785.76 | −$290.93 | −268.2 | $1,840.16 | 91% | 97.0× |
-| Imbalance taker | 100 µs | −$1,823.91 | $221.50 | −$1,758.87 | −$286.54 | −274.8 | $1,840.14 | 89% | 95.5× |
-| Imbalance taker | 1 ms | −$1,764.93 | $202.58 | −$1,689.63 | −$277.88 | −268.2 | $1,780.83 | 84% | 92.6× |
-| Imbalance maker | 10 µs | −$122.00 | $15.50 | −$110.50 | −$27.00 | −50.0 | $122.00 | 9% | 9.0× |
-| Imbalance maker | 100 µs | −$126.00 | $13.50 | −$112.50 | −$27.00 | −52.0 | $126.00 | 9% | 9.0× |
-| Imbalance maker | 1 ms | −$132.20 | $33.50 | −$137.50 | −$28.20 | −53.7 | $132.20 | 9% | 9.4× |
-
-### AAPL (190,747 events)
-
-| Strategy | Latency | Net PnL | Signal | Spread | Fees | Sharpe | Max DD | Fill rate | Turnover |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| Buy open, sell close | 10 µs | $7.40 | $65.80 | −$57.80 | −$0.60 | 0.3 | $544.50 | 75% | 0.2× |
-| Buy open, sell close | 100 µs | $7.40 | $65.80 | −$57.80 | −$0.60 | 0.3 | $544.50 | 75% | 0.2× |
-| Buy open, sell close | 1 ms | −$41.70 | $41.25 | −$82.35 | −$0.60 | −1.1 | $559.90 | 70% | 0.2× |
-| Imbalance taker | 10 µs | −$810.39 | $55.42 | −$837.14 | −$28.67 | −65.6 | $855.55 | 22% | 9.6× |
-| Imbalance taker | 100 µs | −$815.72 | $73.49 | −$860.00 | −$29.21 | −66.1 | $858.53 | 22% | 9.7× |
-| Imbalance taker | 1 ms | −$798.68 | $73.89 | −$841.40 | −$31.17 | −66.0 | $833.22 | 23% | 10.4× |
-| Imbalance maker | 10 µs | −$504.56 | −$21.65 | −$442.64 | −$40.27 | −72.8 | $532.26 | 15% | 13.4× |
-| Imbalance maker | 100 µs | −$510.21 | −$22.34 | −$447.32 | −$40.54 | −72.9 | $537.91 | 16% | 13.5× |
-| Imbalance maker | 1 ms | −$514.19 | −$11.84 | −$460.01 | −$42.34 | −71.1 | $541.89 | 17% | 14.1× |
-
-### What the numbers say
-
-- **The signal is real, but the spread eats it.** The imbalance taker's *signal* PnL is
-  positive for both symbols: prices did move the way the imbalance pointed. But crossing the
-  spread on every entry and exit costs 7 to 15 times what the signal earns. In
-  this form the strategy loses money, and the breakdown shows exactly why.
-- **Providing liquidity has its own cost: adverse selection.** The maker earns the spread on
-  entry, but fills only 9–17% of the time. Those fills come disproportionately when the
-  market is about to move through its price, and on AAPL its signal PnL turns negative. A
-  passive fill happens because someone was willing to trade against you, which is
-  information.
-- **Latency barely matters at a 10-second horizon.** The 10 µs to 1 ms results differ by a
-  few percent, within the noise of which IOCs happened to find liquidity. Latency starts to
-  matter when the holding period approaches the time it takes the book to change.
-- **Buy-and-hold is mostly market direction.** SPY rose about $0.68 between the open and
-  15:55. On AAPL, BX's thin book at the open (a $1.09 spread at 09:30:00) and at the close
-  makes the single round trip cost $58–82 in spread. The flatten needed several IOCs, hence
-  the fill rate below 100%.
-
-**How to read the metrics:**
-
-| Metric | Meaning here |
-|---|---|
-| **Signal / spread split** | Spread is each fill's price versus the mid at that moment. For passive fills that happen because the market moved through the order's price, the mid has already moved, so adverse selection at the moment of the fill shows up under spread. |
-| **Sharpe** | Mean / std of 1-minute PnL changes × √(252 × 390). On one day, a strategy that loses steadily gets an extreme value. It is reported because the guide asks for it, but only means anything over many days. |
-| **Fill rate** | Filled shares / submitted shares. Repeated exit and flatten IOCs count as submissions. |
-| **Turnover** | Shares traded / the 1,000-share position limit. |
+**What this shows:**
+- **The signal is real, but crossing the spread costs more than it earns.** The imbalance
+  taker predicted the direction correctly often enough to make $222. It paid $1,759 to get
+  in and out.
+- **Waiting in the queue has a hidden cost.** The maker only gets filled 9% of the time.
+  Those fills tend to happen just before the price moves against it, which is called
+  *adverse selection*.
+- **Latency barely matters at this horizon.** The trades last 10 seconds, so 10 µs vs 1 ms
+  makes no real difference.
 
 ## Limitations
 
-- **One venue.** This file is NASDAQ BX only. BX's displayed book is thin: AAPL had 45 shares
-  at the best bid at 15:55, with the next bid $4.91 lower. Real execution routes across
-  exchanges to the national best price. Results here are what a BX-only trader would have
-  got, which is pessimistic. The full NASDAQ TotalView files (5–12 GB) have much deeper
-  books.
-- **One day.** Nothing here is a statistically meaningful estimate of a strategy's
-  performance. The ML phase trains and tests across several days.
-- **No market impact.** The strategy's orders don't change the replayed book or other
-  traders' behaviour. At 100 shares that is a reasonable approximation; at size it isn't.
+- **One exchange:** this data covers NASDAQ BX only, which has thin books. For example,
+  AAPL had just 45 shares at the best bid at 15:55. Real traders route orders across all
+  exchanges.
+- **One day:** a single day can't tell you whether a strategy works in general.
+- **No market impact:** fine for 100 shares, wrong for large orders.

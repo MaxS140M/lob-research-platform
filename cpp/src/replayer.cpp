@@ -1,3 +1,7 @@
+// Replays a day for chosen stocks and collects results for Python:
+//   Session       books + snapshots on a time grid + trades (snapshots(), trades())
+//   EventSession  one stock's every book event, with queue priorities (events())
+
 #include "lob/replayer.hpp"
 
 #include <algorithm>
