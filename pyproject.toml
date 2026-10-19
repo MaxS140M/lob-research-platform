@@ -4,7 +4,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "lobpy"
-version = "1.0.0"
+version = "1.1.0"
 description = "Python research layer for the lob C++ order book engine: backtester, features and models."
 readme = "README.md"
 license = { text = "MIT" }

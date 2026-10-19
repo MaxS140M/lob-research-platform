@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-19
+
+Interactive dashboard.
+
+### Added
+
+- `dashboard/app.py`, a Streamlit order book explorer. Pick a day, a stock and a second of
+  the trading day to see ([#13]):
+  - the top 10 price levels on each side, rebuilt by the C++ engine
+  - best bid and ask, spread, mid and imbalance
+  - price and trades 5 minutes either side
+  - the 5-second LightGBM model's prediction, flagged when the model is confident but the
+    spread is too wide to trade
+
+  Links such as `?day=20200130&symbol=SPY&t=10:00:11` open a specific moment. Install with
+  `pip install ".[dashboard]"`.
+- A dashboard demo GIF at the top of the README (`docs/images/dashboard.gif`, a screen
+  recording compressed to 4 MB). `scripts/record_dashboard_gif.py` can also record one
+  automatically by driving the dashboard in headless Chromium. ([#13])
+- Dashboard tests: the app renders on the sample file, shows the hand-computed book, and the
+  time buttons step through the day. They run in CI. ([#13])
+
 ## [1.0.0] - 2026-10-19
 
 Results, write-up and polish. The project is complete.
@@ -230,7 +252,8 @@ Project skeleton, build and CI.
 - `lobpy` Python package with pytest. ([#1])
 - GitHub Actions CI running the C++ and Python test suites. ([#1])
 
-[Unreleased]: https://github.com/MaxS140M/lob-research-platform/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/MaxS140M/lob-research-platform/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/MaxS140M/lob-research-platform/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/MaxS140M/lob-research-platform/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/MaxS140M/lob-research-platform/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/MaxS140M/lob-research-platform/compare/v0.4.0...v0.5.0
@@ -249,3 +272,4 @@ Project skeleton, build and CI.
 [#10]: https://github.com/MaxS140M/lob-research-platform/pull/10
 [#11]: https://github.com/MaxS140M/lob-research-platform/pull/11
 [#12]: https://github.com/MaxS140M/lob-research-platform/pull/12
+[#13]: https://github.com/MaxS140M/lob-research-platform/pull/13
