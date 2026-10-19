@@ -2,6 +2,43 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-19
+
+ML signal.
+
+### Added
+
+- `lobpy.research`, ML research on order book data ([#11]):
+  - **Features:** top-level and multi-level imbalance, spread, microprice offset, order flow
+    imbalance, recent trade flow, short-term volatility and momentum.
+  - **Labels:** up, flat or down mid-price direction at configurable horizons.
+  - **Validation:** expanding-window walk-forward with an embargo.
+  - **Models**, simplest first: majority class, imbalance rule, logistic regression and
+    LightGBM.
+  - `PredictionTaker`, which trades model probabilities in the backtester, optionally only
+    at tight spreads.
+- `scripts/run_research.py`: the full study over four development days and one holdout day.
+  It covers walk-forward validation, one holdout test, and backtests of the predictions at
+  two thresholds. `scripts/research_tables.py` and `scripts/research_diagnose.py` produce
+  the tables. ([#11])
+- [docs/research.md](docs/research.md), the write-up, with feature importance charts and
+  raw results in `docs/research/`. ([#11])
+  - **Prediction works:** LightGBM beats every baseline on holdout log-loss at 1 s, 5 s and
+    30 s, and in 20 of 21 walk-forward folds.
+  - **Trading doesn't:** the model is most confident when the spread is widest (median 47–56
+    ticks vs 3), so trading it loses heavily.
+  - **Cost-aware variant:** restricted to tradeable states, a small real edge remains at
+    1–5 s, but it is smaller than the cost of crossing the spread.
+- Tests for the research layer ([#11]):
+  - feature formulas
+  - a **no-lookahead test** that scrambles future data and checks that no earlier feature
+    changes
+  - walk-forward ordering and the embargo
+  - models beating the baseline on a planted signal
+  - the prediction strategy never using a later prediction
+- `scikit-learn` and `lightgbm` added to the `dev` extra, so CI runs the research tests.
+  ([#11])
+
 ## [0.5.0] - 2026-10-19
 
 Event-driven backtester.
@@ -161,7 +198,8 @@ Project skeleton, build and CI.
 - `lobpy` Python package with pytest. ([#1])
 - GitHub Actions CI running the C++ and Python test suites. ([#1])
 
-[Unreleased]: https://github.com/MaxS140M/lob-research-platform/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/MaxS140M/lob-research-platform/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/MaxS140M/lob-research-platform/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/MaxS140M/lob-research-platform/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/MaxS140M/lob-research-platform/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/MaxS140M/lob-research-platform/compare/v0.2.0...v0.3.0
@@ -176,3 +214,4 @@ Project skeleton, build and CI.
 [#8]: https://github.com/MaxS140M/lob-research-platform/pull/8
 [#9]: https://github.com/MaxS140M/lob-research-platform/pull/9
 [#10]: https://github.com/MaxS140M/lob-research-platform/pull/10
+[#11]: https://github.com/MaxS140M/lob-research-platform/pull/11
