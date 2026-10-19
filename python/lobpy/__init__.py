@@ -11,6 +11,6 @@ The replay runs in C++ (see lobpy._lob); results come back as NumPy arrays witho
 from ._lob import PRICE_SCALE, Replayer
 from .frames import snapshots_frame, trades_frame
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 __all__ = ["PRICE_SCALE", "Replayer", "snapshots_frame", "trades_frame", "__version__"]

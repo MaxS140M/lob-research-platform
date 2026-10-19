@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-19
+
+Event-driven backtester.
+
+### Added
+
+- `lobpy.backtest`, an event-driven backtester in four parts ([#10]):
+  - **Data feed** (`EventFeed`): every book event for a symbol, in time order.
+  - **Strategy** protocol: sees one `BookSnapshot` at a time and never the future.
+  - **Execution simulator:**
+    - **Latency:** orders and cancels reach the exchange after a configurable delay.
+    - **Spread crossing:** market and IOC orders walk the visible book level by level.
+    - **Queue position:** passive orders join the back of the queue and move up only as
+      orders that were ahead of them execute or cancel.
+    - **Passive fills:** when an order behind executes, on trade-throughs, and when the
+      opposite side reaches the order's price.
+    - **Fees:** per share, separately for taking and providing liquidity.
+  - **Portfolio:** exact integer accounting and a position limit that counts open orders.
+    From 15:55 a forced flat cancels everything and exits with IOCs at the touch.
+- Metrics: net PnL split into signal, spread and fees, plus Sharpe, max drawdown, fill
+  rate, turnover and order counts. ([#10])
+- `Replayer.events(symbol, depth)` in C++ and Python. It returns one row per book event,
+  with each affected order's queue priority and the book after the event. ([#10])
+- Immediate-or-cancel limit orders (`LimitOrder(..., ioc=True)`). ([#10])
+- Example strategies: buy-open/sell-close, and an order book imbalance strategy in a taker
+  version and a maker version. ([#10])
+- `scripts/run_backtests.py` and [docs/backtest.md](docs/backtest.md): results on SPY and
+  AAPL at 10 µs, 100 µs and 1 ms latency, with assumptions and limitations. ([#10])
+- Tests:
+  - 19 backtester tests with hand-computed expectations, including the guide's
+    buy-at-open / sell-at-close case on `testdata/sample.itch` (net −$2.60).
+  - 3 C++ tests for the event feed. ([#10])
+
 ## [0.4.0] - 2026-10-17
 
 Python bindings.
@@ -128,7 +161,8 @@ Project skeleton, build and CI.
 - `lobpy` Python package with pytest. ([#1])
 - GitHub Actions CI running the C++ and Python test suites. ([#1])
 
-[Unreleased]: https://github.com/MaxS140M/lob-research-platform/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/MaxS140M/lob-research-platform/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/MaxS140M/lob-research-platform/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/MaxS140M/lob-research-platform/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/MaxS140M/lob-research-platform/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/MaxS140M/lob-research-platform/compare/v0.1.0...v0.2.0
@@ -141,3 +175,4 @@ Project skeleton, build and CI.
 [#7]: https://github.com/MaxS140M/lob-research-platform/pull/7
 [#8]: https://github.com/MaxS140M/lob-research-platform/pull/8
 [#9]: https://github.com/MaxS140M/lob-research-platform/pull/9
+[#10]: https://github.com/MaxS140M/lob-research-platform/pull/10
