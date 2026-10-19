@@ -21,6 +21,7 @@ from .types import (
     BUY,
     SECOND,
     SELL,
+    Action,
     BacktestConfig,
     BookSnapshot,
     Cancel,
@@ -34,11 +35,13 @@ _E, _C, _P = ord("E"), ord("C"), ord("P")
 
 
 class Backtester:
-    def __init__(self, feed: EventFeed, config: BacktestConfig | None = None):
+    def __init__(self, feed: EventFeed, config: BacktestConfig | None = None) -> None:
         self.feed = feed
         self.config = config or BacktestConfig()
         if self.feed.depth and self.config.depth > self.feed.depth:
-            raise ValueError(f"config.depth {self.config.depth} exceeds feed depth {self.feed.depth}")
+            raise ValueError(
+                f"config.depth {self.config.depth} exceeds feed depth {self.feed.depth}"
+            )
 
     def run(self, strategy: Strategy) -> BacktestResult:
         cfg = self.config
@@ -56,7 +59,7 @@ class Backtester:
 
         sim = ExecutionSimulator(cfg, self.feed, on_fill, on_done)
 
-        def submit(action, now: int, *, bypass_risk: bool = False) -> None:
+        def submit(action: Action, now: int, *, bypass_risk: bool = False) -> None:
             nonlocal next_id, orders, rejected
             if isinstance(action, Cancel):
                 sim.send(action, now)
@@ -88,9 +91,19 @@ class Backtester:
 
         for start, c in self.feed.chunks():
             ts, seq, kind, side = c["timestamp"], c["seq"], c["kind"], c["side"]
-            price, shares, trade_price, priority = c["price"], c["shares"], c["trade_price"], c["priority"]
+            price, shares, trade_price, priority = (
+                c["price"],
+                c["shares"],
+                c["trade_price"],
+                c["priority"],
+            )
             old_price, old_shares, old_priority = c["old_price"], c["old_shares"], c["old_priority"]
-            bid_px, bid_sz, ask_px, ask_sz = c["bid_price_1"], c["bid_size_1"], c["ask_price_1"], c["ask_size_1"]
+            bid_px, bid_sz, ask_px, ask_sz = (
+                c["bid_price_1"],
+                c["bid_size_1"],
+                c["ask_price_1"],
+                c["ask_size_1"],
+            )
 
             for j in range(len(ts)):
                 t = ts[j]
@@ -103,8 +116,20 @@ class Backtester:
                 if bid and ask:
                     mid = (bid + ask) / 2
                 if sim.resting:
-                    sim.on_event(kind[j], side[j], price[j], shares[j], priority[j], old_price[j],
-                                 old_shares[j], old_priority[j], bid, ask, t, mid)  # fmt: skip
+                    sim.on_event(
+                        kind[j],
+                        side[j],
+                        price[j],
+                        shares[j],
+                        priority[j],
+                        old_price[j],
+                        old_shares[j],
+                        old_priority[j],
+                        bid,
+                        ask,
+                        t,
+                        mid,
+                    )
                 prev_row, prev_seq, prev_mid = start + j, seq[j], mid
 
                 if t >= next_sample:
@@ -119,8 +144,11 @@ class Backtester:
                             sim.send(Cancel(order_id), t)
                     pos = account.position
                     touch = bid if pos > 0 else ask
-                    if pos and touch and (flatten_order is None
-                                          or flatten_order not in account.open_orders):
+                    if (
+                        pos
+                        and touch
+                        and (flatten_order is None or flatten_order not in account.open_orders)
+                    ):
                         side_out = SELL if pos > 0 else BUY
                         submit(LimitOrder(side_out, abs(pos), touch, ioc=True), t, bypass_risk=True)
                         flatten_order = next_id
@@ -130,10 +158,18 @@ class Backtester:
                 k = kind[j]
                 is_trade = k == _E or k == _C or k == _P
                 snapshot = BookSnapshot(
-                    t, chr(k), bid, bid_sz[j], ask, ask_sz[j],
-                    trade_price[j] if is_trade else 0, shares[j] if is_trade else 0,
-                    -side[j] if is_trade else 0, self.feed, start + j,
-                )  # fmt: skip
+                    t,
+                    chr(k),
+                    bid,
+                    bid_sz[j],
+                    ask,
+                    ask_sz[j],
+                    trade_price[j] if is_trade else 0,
+                    shares[j] if is_trade else 0,
+                    -side[j] if is_trade else 0,
+                    self.feed,
+                    start + j,
+                )
                 actions = strategy.on_book_update(snapshot)
                 if actions:
                     for action in actions:
@@ -147,10 +183,19 @@ class Backtester:
 
         notes = []
         if account.position:
-            notes.append(f"ended with an open position of {account.position} shares, "
-                         "marked at the last mid")  # fmt: skip
+            notes.append(
+                f"ended with an open position of {account.position} shares, marked at the last mid"
+            )
         if sim.resting:
             notes.append(f"{len(sim.resting)} orders still resting at the end of the data")
-        return build_result(config=cfg, symbol=self.feed.symbol, portfolio=portfolio,
-                            simulator=sim, equity_samples=equity_samples, final_mid=mid,
-                            orders=orders, rejected=rejected, notes=notes)  # fmt: skip
+        return build_result(
+            config=cfg,
+            symbol=self.feed.symbol,
+            portfolio=portfolio,
+            simulator=sim,
+            equity_samples=equity_samples,
+            final_mid=mid,
+            orders=orders,
+            rejected=rejected,
+            notes=notes,
+        )

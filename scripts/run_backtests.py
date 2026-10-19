@@ -21,9 +21,10 @@ LATENCIES = {"10 us": 10_000, "100 us": 100_000, "1 ms": 1_000_000}
 STRATEGIES = {
     "Buy open, sell close": lambda: BuyOpenSellClose(quantity=100, open_ns=OPEN),
     "Imbalance taker": lambda: ImbalanceTaker(threshold=0.8, quantity=100, hold_ns=10 * SECOND),
-    "Imbalance maker": lambda: ImbalanceMaker(threshold=0.8, quantity=100, hold_ns=10 * SECOND,
-                                              patience_ns=2 * SECOND),
-}  # fmt: skip
+    "Imbalance maker": lambda: ImbalanceMaker(
+        threshold=0.8, quantity=100, hold_ns=10 * SECOND, patience_ns=2 * SECOND
+    ),
+}
 
 
 def main() -> None:
@@ -31,12 +32,16 @@ def main() -> None:
     symbols = sys.argv[2:] or ["SPY"]
     replayer = lobpy.Replayer(path, symbols)
 
-    header = ("| Strategy | Latency | Net PnL | Signal | Spread | Fees | Sharpe | Max DD "
-              "| Fill rate | Turnover | Round trips |")  # fmt: skip
+    header = (
+        "| Strategy | Latency | Net PnL | Signal | Spread | Fees | Sharpe | Max DD "
+        "| Fill rate | Turnover | Round trips |"
+    )
     for symbol in symbols:
         t0 = time.perf_counter()
         feed = EventFeed.from_replayer(replayer, symbol, depth=5, start_ns=OPEN, end_ns=CLOSE)
-        print(f"\n### {symbol}: {len(feed):,} events (fetched in {time.perf_counter() - t0:.2f} s)\n")
+        print(
+            f"\n### {symbol}: {len(feed):,} events (fetched in {time.perf_counter() - t0:.2f} s)\n"
+        )
         print(header)
         print("|---|---|" + "---:|" * 9)
         for name, make in STRATEGIES.items():

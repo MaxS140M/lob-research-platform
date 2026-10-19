@@ -7,6 +7,8 @@ test folds (tuning on test data is another form of leakage).
 
 from __future__ import annotations
 
+from typing import Self
+
 import numpy as np
 import pandas as pd
 
@@ -25,7 +27,7 @@ class MajorityBaseline:
 
     name = "Majority class"
 
-    def fit(self, X: pd.DataFrame, y: np.ndarray):
+    def fit(self, X: pd.DataFrame, y: np.ndarray) -> Self:
         self.p = _frequencies(y)
         return self
 
@@ -34,7 +36,7 @@ class MajorityBaseline:
 
 
 class ImbalanceRule:
-    """"Imbalance > 0 means up": predicts UP for positive top-of-book imbalance, DOWN for
+    """ "Imbalance > 0 means up": predicts UP for positive top-of-book imbalance, DOWN for
     negative and FLAT for zero. Probabilities are the training frequencies of each outcome
     within each of those three groups, so it can be scored by log-loss too."""
 
@@ -44,7 +46,7 @@ class ImbalanceRule:
         imb = X["imbalance_l1"].fillna(0).to_numpy()
         return np.where(imb > 0, UP, np.where(imb < 0, DOWN, FLAT))
 
-    def fit(self, X: pd.DataFrame, y: np.ndarray):
+    def fit(self, X: pd.DataFrame, y: np.ndarray) -> Self:
         g = self._group(X)
         self.p = np.vstack([_frequencies(y[g == k]) for k in range(N_CLASSES)])
         return self
@@ -70,7 +72,7 @@ class Logistic:
     def _prepare(self, X: pd.DataFrame) -> np.ndarray:
         return X.clip(self.lo, self.hi, axis=1).fillna(self.median).to_numpy()
 
-    def fit(self, X: pd.DataFrame, y: np.ndarray):
+    def fit(self, X: pd.DataFrame, y: np.ndarray) -> Self:
         from sklearn.linear_model import LogisticRegression
         from sklearn.pipeline import make_pipeline
         from sklearn.preprocessing import StandardScaler
@@ -92,18 +94,27 @@ class GradientBoosting:
 
     name = "LightGBM"
 
-    def __init__(self, seed: int = 0, min_child_samples: int = 2_000):
+    def __init__(self, seed: int = 0, min_child_samples: int = 2_000) -> None:
         self.seed = seed
         self.min_child_samples = min_child_samples
 
-    def fit(self, X: pd.DataFrame, y: np.ndarray):
+    def fit(self, X: pd.DataFrame, y: np.ndarray) -> Self:
         import lightgbm as lgb
 
         self.model = lgb.LGBMClassifier(
-            objective="multiclass", n_estimators=150, learning_rate=0.05, num_leaves=15,
-            min_child_samples=self.min_child_samples, subsample=0.5, subsample_freq=1, colsample_bytree=0.8,
-            reg_lambda=1.0, random_state=self.seed, verbose=-1, n_jobs=-1,
-        )  # fmt: skip
+            objective="multiclass",
+            n_estimators=150,
+            learning_rate=0.05,
+            num_leaves=15,
+            min_child_samples=self.min_child_samples,
+            subsample=0.5,
+            subsample_freq=1,
+            colsample_bytree=0.8,
+            reg_lambda=1.0,
+            random_state=self.seed,
+            verbose=-1,
+            n_jobs=-1,
+        )
         self.model.fit(X, y.astype(int))
         return self
 
@@ -115,7 +126,9 @@ class GradientBoosting:
         return pd.Series(gain / gain.sum(), index=features)
 
 
-def score(y: np.ndarray, proba: np.ndarray, predicted: np.ndarray | None = None) -> dict[str, float]:
+def score(
+    y: np.ndarray, proba: np.ndarray, predicted: np.ndarray | None = None
+) -> dict[str, float]:
     """Accuracy, balanced accuracy (mean recall over the three classes) and log-loss."""
     from sklearn.metrics import balanced_accuracy_score, log_loss
 

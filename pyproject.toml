@@ -35,3 +35,19 @@ LOB_BUILD_BENCHMARKS = "OFF"
 
 [tool.pytest.ini_options]
 testpaths = ["python/tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["python", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "ANN001", "ANN201", "ANN202", "ANN204"]
+
+# Type hints are required in the library; tests and scripts are exempt.
+[tool.ruff.lint.per-file-ignores]
+"python/tests/*" = ["ANN"]
+"scripts/*" = ["ANN"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["lobpy"]

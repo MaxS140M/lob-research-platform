@@ -14,7 +14,7 @@ class Portfolio:
     strategy paid to cross the spread (negative) or earned by providing liquidity (positive).
     """
 
-    def __init__(self, config: BacktestConfig):
+    def __init__(self, config: BacktestConfig) -> None:
         self.config = config
         self.account = Account()
         self.spread_pnl = 0.0
