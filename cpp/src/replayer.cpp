@@ -1,5 +1,6 @@
 #include "lob/replayer.hpp"
 
+#include <algorithm>
 #include <span>
 #include <stdexcept>
 #include <unordered_map>
@@ -206,6 +207,142 @@ private:
     TradeData* trades_ = nullptr;
 };
 
+// Replays one symbol's book and records every event touching it, with queue priorities.
+class EventSession {
+public:
+    EventSession(std::uint16_t locate, std::size_t depth, std::uint64_t start, std::uint64_t end,
+                 EventData& out)
+        : locate_(locate), depth_(depth), start_(start), end_(end), out_(out) {}
+
+    void on_add_order(const itch::AddOrder& m) {
+        if (m.stock_locate != locate_) return;
+        ++seq_;
+        if (!book_.add(m.order_ref, to_side(m.side), m.price, m.shares)) return;
+        priority_[m.order_ref] = seq_;
+        emit(m, 'A', sign(to_side(m.side)), m.price, m.shares, 0, current_seq());
+    }
+
+    void on_order_executed(const itch::OrderExecuted& m) {
+        reduce(m, 'E', m.order_ref, m.executed_shares, std::nullopt);
+    }
+
+    void on_order_executed_with_price(const itch::OrderExecutedWithPrice& m) {
+        reduce(m, 'C', m.order_ref, m.executed_shares, m.execution_price);
+    }
+
+    void on_order_cancel(const itch::OrderCancel& m) {
+        reduce(m, 'X', m.order_ref, m.cancelled_shares, std::nullopt);
+    }
+
+    void on_order_delete(const itch::OrderDelete& m) {
+        if (m.stock_locate != locate_) return;
+        ++seq_;
+        const auto order = book_.find(m.order_ref);
+        if (!order) return;
+        const std::int64_t priority = take_priority(m.order_ref);
+        book_.remove(m.order_ref);
+        emit(m, 'D', sign(order->side), order->price, order->quantity, 0, priority);
+    }
+
+    void on_order_replace(const itch::OrderReplace& m) {
+        if (m.stock_locate != locate_) return;
+        ++seq_;
+        const auto old = book_.find(m.original_order_ref);
+        if (!old) return;
+        if (!book_.replace(m.original_order_ref, m.new_order_ref, m.price, m.shares)) return;
+        const std::int64_t old_priority = take_priority(m.original_order_ref);
+        priority_[m.new_order_ref] = seq_;  // a replace loses time priority
+        emit(m, 'U', sign(old->side), m.price, m.shares, 0, current_seq(), old->price,
+             old->quantity, old_priority);
+    }
+
+    void on_trade(const itch::Trade& m) {
+        if (m.stock_locate != locate_) return;
+        ++seq_;
+        emit(m, 'P', sign(to_side(m.side)), m.price, m.shares, m.price, 0);
+    }
+
+    void on_cross_trade(const itch::CrossTrade& m) {
+        if (m.stock_locate != locate_) return;
+        ++seq_;
+        emit(m, 'Q', 0, m.cross_price, static_cast<std::int64_t>(m.shares), m.cross_price, 0);
+    }
+
+private:
+    static std::int8_t sign(Side s) noexcept { return s == Side::kBuy ? 1 : -1; }
+
+    std::int64_t current_seq() const noexcept { return static_cast<std::int64_t>(seq_); }
+
+    std::int64_t take_priority(OrderId id) {
+        const auto it = priority_.find(id);
+        if (it == priority_.end()) return 0;
+        const auto p = static_cast<std::int64_t>(it->second);
+        priority_.erase(it);
+        return p;
+    }
+
+    void reduce(const itch::MessageHeader& h, char kind, OrderId id, Quantity shares,
+                std::optional<Price> execution_price) {
+        if (h.stock_locate != locate_) return;
+        ++seq_;
+        const auto order = book_.find(id);
+        if (!order) return;
+        const auto it = priority_.find(id);
+        const std::int64_t priority =
+            it == priority_.end() ? 0 : static_cast<std::int64_t>(it->second);
+        const Quantity removed = book_.reduce(id, shares);
+        if (!book_.find(id)) priority_.erase(id);
+        const bool is_execution = kind == 'E' || kind == 'C';
+        const std::int64_t trade_price = is_execution ? execution_price.value_or(order->price) : 0;
+        emit(h, kind, sign(order->side), order->price, removed, trade_price, priority);
+    }
+
+    void emit(const itch::MessageHeader& h, char kind, std::int8_t side, std::int64_t price,
+              std::int64_t shares, std::int64_t trade_price, std::int64_t priority,
+              std::int64_t old_price = 0, std::int64_t old_shares = 0,
+              std::int64_t old_priority = 0) {
+        if (h.timestamp_ns < start_ || h.timestamp_ns > end_) return;
+        out_.timestamp.push_back(static_cast<std::int64_t>(h.timestamp_ns));
+        out_.seq.push_back(static_cast<std::int64_t>(seq_));
+        out_.kind.push_back(static_cast<std::uint8_t>(kind));
+        out_.side.push_back(side);
+        out_.price.push_back(price);
+        out_.shares.push_back(shares);
+        out_.trade_price.push_back(trade_price);
+        out_.priority.push_back(priority);
+        out_.old_price.push_back(old_price);
+        out_.old_shares.push_back(old_shares);
+        out_.old_priority.push_back(old_priority);
+
+        const std::size_t base = out_.bid_price.size();
+        out_.bid_price.resize(base + depth_, 0);
+        out_.bid_size.resize(base + depth_, 0);
+        out_.ask_price.resize(base + depth_, 0);
+        out_.ask_size.resize(base + depth_, 0);
+        std::size_t level = 0;
+        book_.for_each_level(Side::kBuy, depth_, [&](const LevelInfo& l) {
+            out_.bid_price[base + level] = l.price;
+            out_.bid_size[base + level] = l.quantity;
+            ++level;
+        });
+        level = 0;
+        book_.for_each_level(Side::kSell, depth_, [&](const LevelInfo& l) {
+            out_.ask_price[base + level] = l.price;
+            out_.ask_size[base + level] = l.quantity;
+            ++level;
+        });
+    }
+
+    std::uint16_t locate_;
+    std::size_t depth_;
+    std::uint64_t start_;
+    std::uint64_t end_;
+    EventData& out_;
+    OrderBook book_;
+    std::unordered_map<OrderId, std::uint64_t> priority_;
+    std::uint64_t seq_ = 0;
+};
+
 }  // namespace
 
 Replayer::Replayer(const std::filesystem::path& path, std::vector<std::string> symbols)
@@ -271,6 +408,27 @@ TradeData Replayer::trades() const {
     TradeData out;
     Session session(slot_of_locate_, symbols_.size());
     session.record_trades(&out);
+    check_parse(itch::parse(file_.bytes(), session));
+    return out;
+}
+
+EventData Replayer::events(const std::string& symbol, std::size_t depth,
+                           std::optional<std::uint64_t> start_ns,
+                           std::optional<std::uint64_t> end_ns) const {
+    if (depth == 0) throw std::invalid_argument("depth must be positive");
+    const auto it = std::find(symbols_.begin(), symbols_.end(), symbol);
+    if (it == symbols_.end()) {
+        throw std::invalid_argument("symbol not in this Replayer: " + symbol);
+    }
+    std::uint16_t locate = 0;
+    const auto slot = static_cast<std::int32_t>(it - symbols_.begin());
+    for (std::size_t l = 0; l < slot_of_locate_.size(); ++l) {
+        if (slot_of_locate_[l] == slot) locate = static_cast<std::uint16_t>(l);
+    }
+
+    EventData out;
+    out.depth = depth;
+    EventSession session(locate, depth, start_ns.value_or(0), end_ns.value_or(UINT64_MAX), out);
     check_parse(itch::parse(file_.bytes(), session));
     return out;
 }
