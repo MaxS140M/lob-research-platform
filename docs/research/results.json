@@ -1,0 +1,1172 @@
+{
+  "setup": {
+    "dev_days": [
+      "20190730",
+      "20190830",
+      "20191030",
+      "20191230"
+    ],
+    "holdout_day": "20200130",
+    "symbols": [
+      "SPY",
+      "QQQ",
+      "IWM",
+      "AAPL",
+      "MSFT"
+    ],
+    "interval_ms": 250,
+    "window": "09:35-15:55",
+    "dev_rows": 1824020,
+    "holdout_rows": 456005,
+    "features": [
+      "imbalance_l1",
+      "imbalance_l5",
+      "spread_ticks",
+      "microprice_offset",
+      "ofi_1",
+      "ofi_1s",
+      "trade_flow_20",
+      "volatility_5s",
+      "return_1s"
+    ]
+  },
+  "horizons": {
+    "1s": {
+      "class_share_dev": [
+        0.21309089114773513,
+        0.5717013717556498,
+        0.21520773709661503
+      ],
+      "class_share_holdout": [
+        0.29899009835849866,
+        0.3972784192462471,
+        0.3037314823952542
+      ],
+      "walk_forward": {
+        "Majority class": {
+          "accuracy": 0.5739053007048841,
+          "balanced_accuracy": 0.3333333333333333,
+          "log_loss": 0.983397351536924
+        },
+        "Imbalance rule": {
+          "accuracy": 0.40931204437998087,
+          "balanced_accuracy": 0.40702860347330444,
+          "log_loss": 0.9759025875440862
+        },
+        "Logistic regression": {
+          "accuracy": 0.5747806221504811,
+          "balanced_accuracy": 0.3392110608991011,
+          "log_loss": 0.9647198301512685
+        },
+        "LightGBM": {
+          "accuracy": 0.5812687750199895,
+          "balanced_accuracy": 0.3853742223907574,
+          "log_loss": 0.9181027905761632
+        }
+      },
+      "walk_forward_folds": {
+        "Majority class": [
+          {
+            "block": "20190730 pm",
+            "rows": 227985,
+            "accuracy": 0.6688247033796083,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 0.8909023214688105
+          },
+          {
+            "block": "20190830 am",
+            "rows": 228000,
+            "accuracy": 0.4399517543859649,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 1.1349721298732407
+          },
+          {
+            "block": "20190830 pm",
+            "rows": 227985,
+            "accuracy": 0.5439875430401123,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 1.0055964502997217
+          },
+          {
+            "block": "20191030 am",
+            "rows": 228000,
+            "accuracy": 0.6301315789473684,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 0.9277066535605536
+          },
+          {
+            "block": "20191030 pm",
+            "rows": 227985,
+            "accuracy": 0.6347128100532929,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 0.9188108059973568
+          },
+          {
+            "block": "20191230 am",
+            "rows": 228000,
+            "accuracy": 0.48992543859649124,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 1.0625517384712342
+          },
+          {
+            "block": "20191230 pm",
+            "rows": 227985,
+            "accuracy": 0.6098032765313508,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 0.9432413610875507
+          }
+        ],
+        "Imbalance rule": [
+          {
+            "block": "20190730 pm",
+            "rows": 227985,
+            "accuracy": 0.40141675987455316,
+            "balanced_accuracy": 0.4002945491315208,
+            "log_loss": 0.8844087422165796
+          },
+          {
+            "block": "20190830 am",
+            "rows": 228000,
+            "accuracy": 0.422609649122807,
+            "balanced_accuracy": 0.39362680227178837,
+            "log_loss": 1.124327031976188
+          },
+          {
+            "block": "20190830 pm",
+            "rows": 227985,
+            "accuracy": 0.40836458538938963,
+            "balanced_accuracy": 0.36122813223967004,
+            "log_loss": 0.9969012151135407
+          },
+          {
+            "block": "20191030 am",
+            "rows": 228000,
+            "accuracy": 0.44605263157894737,
+            "balanced_accuracy": 0.42662726404363127,
+            "log_loss": 0.9267717830713533
+          },
+          {
+            "block": "20191030 pm",
+            "rows": 227985,
+            "accuracy": 0.411421804066057,
+            "balanced_accuracy": 0.42379114231113135,
+            "log_loss": 0.9150350999470868
+          },
+          {
+            "block": "20191230 am",
+            "rows": 228000,
+            "accuracy": 0.395,
+            "balanced_accuracy": 0.41628691046724703,
+            "log_loss": 1.0522617964017817
+          },
+          {
+            "block": "20191230 pm",
+            "rows": 227985,
+            "accuracy": 0.3803188806281115,
+            "balanced_accuracy": 0.42734542384814206,
+            "log_loss": 0.9316124440820748
+          }
+        ],
+        "Logistic regression": [
+          {
+            "block": "20190730 pm",
+            "rows": 227985,
+            "accuracy": 0.6678728863741036,
+            "balanced_accuracy": 0.3380201470929469,
+            "log_loss": 0.8755016418863274
+          },
+          {
+            "block": "20190830 am",
+            "rows": 228000,
+            "accuracy": 0.44046052631578947,
+            "balanced_accuracy": 0.3349727397591619,
+            "log_loss": 1.1139478056023424
+          },
+          {
+            "block": "20190830 pm",
+            "rows": 227985,
+            "accuracy": 0.5441147443910783,
+            "balanced_accuracy": 0.33444256292801083,
+            "log_loss": 0.9910135917720455
+          },
+          {
+            "block": "20191030 am",
+            "rows": 228000,
+            "accuracy": 0.6295219298245615,
+            "balanced_accuracy": 0.3458096489282398,
+            "log_loss": 0.9024038428162495
+          },
+          {
+            "block": "20191030 pm",
+            "rows": 227985,
+            "accuracy": 0.6362830887997017,
+            "balanced_accuracy": 0.34112232768192924,
+            "log_loss": 0.9007716029792624
+          },
+          {
+            "block": "20191230 am",
+            "rows": 228000,
+            "accuracy": 0.49528508771929824,
+            "balanced_accuracy": 0.34465487327489147,
+            "log_loss": 1.0430266915443633
+          },
+          {
+            "block": "20191230 pm",
+            "rows": 227985,
+            "accuracy": 0.6099260916288353,
+            "balanced_accuracy": 0.3354551266285275,
+            "log_loss": 0.9263736344582891
+          }
+        ],
+        "LightGBM": [
+          {
+            "block": "20190730 pm",
+            "rows": 227985,
+            "accuracy": 0.6580739960962344,
+            "balanced_accuracy": 0.37128045397309,
+            "log_loss": 0.8341308857267371
+          },
+          {
+            "block": "20190830 am",
+            "rows": 228000,
+            "accuracy": 0.47334649122807015,
+            "balanced_accuracy": 0.39027199513352673,
+            "log_loss": 1.028492222875535
+          },
+          {
+            "block": "20190830 pm",
+            "rows": 227985,
+            "accuracy": 0.5520977257275698,
+            "balanced_accuracy": 0.3910443271332782,
+            "log_loss": 0.9550883569036429
+          },
+          {
+            "block": "20191030 am",
+            "rows": 228000,
+            "accuracy": 0.6298947368421053,
+            "balanced_accuracy": 0.38577818931662317,
+            "log_loss": 0.8763505382917917
+          },
+          {
+            "block": "20191030 pm",
+            "rows": 227985,
+            "accuracy": 0.6438274447880343,
+            "balanced_accuracy": 0.3915880323907985,
+            "log_loss": 0.8364786289867824
+          },
+          {
+            "block": "20191230 am",
+            "rows": 228000,
+            "accuracy": 0.5013114035087719,
+            "balanced_accuracy": 0.4007010156910427,
+            "log_loss": 1.002026717894406
+          },
+          {
+            "block": "20191230 pm",
+            "rows": 227985,
+            "accuracy": 0.6103296269491414,
+            "balanced_accuracy": 0.36695554309694245,
+            "log_loss": 0.8941521833542473
+          }
+        ]
+      },
+      "importance": {
+        "volatility_5s": 0.2764246873641653,
+        "return_1s": 0.20667151802664338,
+        "spread_ticks": 0.18189977404373225,
+        "imbalance_l1": 0.08723952141410588,
+        "ofi_1": 0.07888970760237997,
+        "microprice_offset": 0.07050747444320422,
+        "imbalance_l5": 0.05011154385880568,
+        "ofi_1s": 0.03649216430482609,
+        "trade_flow_20": 0.011763608942137202
+      },
+      "holdout": {
+        "Majority class": {
+          "accuracy": 0.3972784192462471,
+          "balanced_accuracy": 0.3333333333333333,
+          "log_loss": 1.1509605532293181
+        },
+        "Imbalance rule": {
+          "accuracy": 0.4196607344539842,
+          "balanced_accuracy": 0.4260253899375574,
+          "log_loss": 1.1379009559539317
+        },
+        "Logistic regression": {
+          "accuracy": 0.39973464039387263,
+          "balanced_accuracy": 0.33709056074000104,
+          "log_loss": 1.1433646924940535
+        },
+        "LightGBM": {
+          "accuracy": 0.449161704880643,
+          "balanced_accuracy": 0.40511593398223106,
+          "log_loss": 1.03401400028549
+        }
+      },
+      "backtest": {
+        "0.5": [
+          {
+            "symbol": "SPY",
+            "signals": 496,
+            "net_pnl": -723.83,
+            "signal_pnl": 174.49,
+            "spread_pnl": -799.59,
+            "fees": 98.73,
+            "traded_shares": 32910,
+            "fill_rate": 0.3203293815336098
+          },
+          {
+            "symbol": "QQQ",
+            "signals": 1164,
+            "net_pnl": -1829.086,
+            "signal_pnl": 374.2950000000001,
+            "spread_pnl": -1891.165,
+            "fees": 312.216,
+            "traded_shares": 104072,
+            "fill_rate": 0.5016243312286114
+          },
+          {
+            "symbol": "IWM",
+            "signals": 487,
+            "net_pnl": -1446.254,
+            "signal_pnl": 68.76000000000022,
+            "spread_pnl": -1293.89,
+            "fees": 221.124,
+            "traded_shares": 73708,
+            "fill_rate": 0.7506288507561485
+          },
+          {
+            "symbol": "AAPL",
+            "signals": 2341,
+            "net_pnl": -309650.322,
+            "signal_pnl": -18650.17499999999,
+            "spread_pnl": -290111.085,
+            "fees": 889.062,
+            "traded_shares": 296354,
+            "fill_rate": 0.68516086671044
+          },
+          {
+            "symbol": "MSFT",
+            "signals": 991,
+            "net_pnl": -17401.818,
+            "signal_pnl": 2652.0200000000004,
+            "spread_pnl": -19958.21,
+            "fees": 95.628,
+            "traded_shares": 31876,
+            "fill_rate": 0.21962092034642175
+          }
+        ],
+        "0.6": [
+          {
+            "symbol": "SPY",
+            "signals": 24,
+            "net_pnl": -68.67,
+            "signal_pnl": 33.66499999999999,
+            "spread_pnl": -92.255,
+            "fees": 10.08,
+            "traded_shares": 3360,
+            "fill_rate": 0.3253922138291691
+          },
+          {
+            "symbol": "QQQ",
+            "signals": 123,
+            "net_pnl": -392.618,
+            "signal_pnl": 107.17500000000001,
+            "spread_pnl": -439.385,
+            "fees": 60.408,
+            "traded_shares": 20136,
+            "fill_rate": 0.699045304634612
+          },
+          {
+            "symbol": "IWM",
+            "signals": 2,
+            "net_pnl": -6.78,
+            "signal_pnl": 0.4549999999999992,
+            "spread_pnl": -6.185,
+            "fees": 1.05,
+            "traded_shares": 350,
+            "fill_rate": 0.5426356589147286
+          },
+          {
+            "symbol": "AAPL",
+            "signals": 759,
+            "net_pnl": -131744.638,
+            "signal_pnl": -560.9200000000128,
+            "spread_pnl": -130901.88,
+            "fees": 281.838,
+            "traded_shares": 93946,
+            "fill_rate": 0.6625433721684674
+          },
+          {
+            "symbol": "MSFT",
+            "signals": 99,
+            "net_pnl": -4016.962,
+            "signal_pnl": 744.4550000000004,
+            "spread_pnl": -4748.175,
+            "fees": 13.242,
+            "traded_shares": 4414,
+            "fill_rate": 0.27189848466182087
+          }
+        ]
+      }
+    },
+    "5s": {
+      "class_share_dev": [
+        0.36142398087320826,
+        0.27181485177833103,
+        0.36676116734846076
+      ],
+      "class_share_holdout": [
+        0.4098002873405644,
+        0.1782257268509887,
+        0.4119739858084469
+      ],
+      "walk_forward": {
+        "Majority class": {
+          "accuracy": 0.3630828592949652,
+          "balanced_accuracy": 0.3333333333333333,
+          "log_loss": 1.096100581881185
+        },
+        "Imbalance rule": {
+          "accuracy": 0.3947682524360087,
+          "balanced_accuracy": 0.405664212558552,
+          "log_loss": 1.0870094097920924
+        },
+        "Logistic regression": {
+          "accuracy": 0.41151926528492977,
+          "balanced_accuracy": 0.37997470766933733,
+          "log_loss": 1.0828693985465383
+        },
+        "LightGBM": {
+          "accuracy": 0.4483636916384333,
+          "balanced_accuracy": 0.42963530800975297,
+          "log_loss": 1.046099233070969
+        }
+      },
+      "walk_forward_folds": {
+        "Majority class": [
+          {
+            "block": "20190730 pm",
+            "rows": 227905,
+            "accuracy": 0.34221276409030077,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 1.1204562267990719
+          },
+          {
+            "block": "20190830 am",
+            "rows": 228000,
+            "accuracy": 0.4101535087719298,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 1.0649548405227913
+          },
+          {
+            "block": "20190830 pm",
+            "rows": 227905,
+            "accuracy": 0.38132555231346393,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 1.0780491679538786
+          },
+          {
+            "block": "20191030 am",
+            "rows": 228000,
+            "accuracy": 0.3408464912280702,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 1.1126730666815667
+          },
+          {
+            "block": "20191030 pm",
+            "rows": 227905,
+            "accuracy": 0.348351286720344,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 1.11027434424927
+          },
+          {
+            "block": "20191230 am",
+            "rows": 228000,
+            "accuracy": 0.38801754385964915,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 1.0791806203268013
+          },
+          {
+            "block": "20191230 pm",
+            "rows": 227905,
+            "accuracy": 0.33067286808099866,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 1.107115806634916
+          }
+        ],
+        "Imbalance rule": [
+          {
+            "block": "20190730 pm",
+            "rows": 227905,
+            "accuracy": 0.39963142537460783,
+            "balanced_accuracy": 0.39942701575950085,
+            "log_loss": 1.1108836762324668
+          },
+          {
+            "block": "20190830 am",
+            "rows": 228000,
+            "accuracy": 0.34141666666666665,
+            "balanced_accuracy": 0.3978911138042121,
+            "log_loss": 1.055499264755847
+          },
+          {
+            "block": "20190830 pm",
+            "rows": 227905,
+            "accuracy": 0.3511901888944955,
+            "balanced_accuracy": 0.37334780855158956,
+            "log_loss": 1.0672108001959795
+          },
+          {
+            "block": "20191030 am",
+            "rows": 228000,
+            "accuracy": 0.418780701754386,
+            "balanced_accuracy": 0.4213937810804891,
+            "log_loss": 1.107496883088041
+          },
+          {
+            "block": "20191030 pm",
+            "rows": 227905,
+            "accuracy": 0.4197494570105965,
+            "balanced_accuracy": 0.4215312096389956,
+            "log_loss": 1.1028229203523716
+          },
+          {
+            "block": "20191230 am",
+            "rows": 228000,
+            "accuracy": 0.42285526315789473,
+            "balanced_accuracy": 0.4174269589934614,
+            "log_loss": 1.0671183507514597
+          },
+          {
+            "block": "20191230 pm",
+            "rows": 227905,
+            "accuracy": 0.4097540641934139,
+            "balanced_accuracy": 0.4086316000816159,
+            "log_loss": 1.0980339731684812
+          }
+        ],
+        "Logistic regression": [
+          {
+            "block": "20190730 pm",
+            "rows": 227905,
+            "accuracy": 0.38655580175950505,
+            "balanced_accuracy": 0.38251556615103466,
+            "log_loss": 1.099192674331426
+          },
+          {
+            "block": "20190830 am",
+            "rows": 228000,
+            "accuracy": 0.4746184210526316,
+            "balanced_accuracy": 0.3795564100603607,
+            "log_loss": 1.0444207128947645
+          },
+          {
+            "block": "20190830 pm",
+            "rows": 227905,
+            "accuracy": 0.4264891073034817,
+            "balanced_accuracy": 0.37419484323100943,
+            "log_loss": 1.063549919146809
+          },
+          {
+            "block": "20191030 am",
+            "rows": 228000,
+            "accuracy": 0.3760438596491228,
+            "balanced_accuracy": 0.3674667169411803,
+            "log_loss": 1.1263771167342933
+          },
+          {
+            "block": "20191030 pm",
+            "rows": 227905,
+            "accuracy": 0.39221166714201094,
+            "balanced_accuracy": 0.3894179551923888,
+            "log_loss": 1.0845517879083344
+          },
+          {
+            "block": "20191230 am",
+            "rows": 228000,
+            "accuracy": 0.4326315789473684,
+            "balanced_accuracy": 0.37978859450819064,
+            "log_loss": 1.065191018315527
+          },
+          {
+            "block": "20191230 pm",
+            "rows": 227905,
+            "accuracy": 0.39208442114038744,
+            "balanced_accuracy": 0.3868828676011972,
+            "log_loss": 1.0968025604946137
+          }
+        ],
+        "LightGBM": [
+          {
+            "block": "20190730 pm",
+            "rows": 227905,
+            "accuracy": 0.4226146859437046,
+            "balanced_accuracy": 0.419509089736807,
+            "log_loss": 1.0599122756798123
+          },
+          {
+            "block": "20190830 am",
+            "rows": 228000,
+            "accuracy": 0.4781666666666667,
+            "balanced_accuracy": 0.41999499242115185,
+            "log_loss": 0.988360914173594
+          },
+          {
+            "block": "20190830 pm",
+            "rows": 227905,
+            "accuracy": 0.4452732498190035,
+            "balanced_accuracy": 0.4100210538621205,
+            "log_loss": 1.0363629933497878
+          },
+          {
+            "block": "20191030 am",
+            "rows": 228000,
+            "accuracy": 0.4387456140350877,
+            "balanced_accuracy": 0.43682065453601143,
+            "log_loss": 1.0874848570116995
+          },
+          {
+            "block": "20191030 pm",
+            "rows": 227905,
+            "accuracy": 0.4670191527171409,
+            "balanced_accuracy": 0.4671722463106196,
+            "log_loss": 1.02418433842745
+          },
+          {
+            "block": "20191230 am",
+            "rows": 228000,
+            "accuracy": 0.4589824561403509,
+            "balanced_accuracy": 0.4291906038599465,
+            "log_loss": 1.0472848475759222
+          },
+          {
+            "block": "20191230 pm",
+            "rows": 227905,
+            "accuracy": 0.42774401614707885,
+            "balanced_accuracy": 0.4247385153416135,
+            "log_loss": 1.0791044052785184
+          }
+        ]
+      },
+      "importance": {
+        "spread_ticks": 0.3073255329698482,
+        "volatility_5s": 0.21010741204024894,
+        "imbalance_l1": 0.11190800416861009,
+        "return_1s": 0.10437928275314046,
+        "imbalance_l5": 0.10386649820406972,
+        "microprice_offset": 0.09783580283342672,
+        "trade_flow_20": 0.031827155353718786,
+        "ofi_1s": 0.01824170287544991,
+        "ofi_1": 0.01450860880148718
+      },
+      "holdout": {
+        "Majority class": {
+          "accuracy": 0.4119739858084469,
+          "balanced_accuracy": 0.3333333333333333,
+          "log_loss": 1.062446374549617
+        },
+        "Imbalance rule": {
+          "accuracy": 0.43810004277206877,
+          "balanced_accuracy": 0.4389929739741966,
+          "log_loss": 1.0472670322567188
+        },
+        "Logistic regression": {
+          "accuracy": 0.44481854772375823,
+          "balanced_accuracy": 0.37132671689247365,
+          "log_loss": 1.048501546317313
+        },
+        "LightGBM": {
+          "accuracy": 0.4837367434004891,
+          "balanced_accuracy": 0.4663887151406339,
+          "log_loss": 0.9781997289599397
+        }
+      },
+      "backtest": {
+        "0.5": [
+          {
+            "symbol": "SPY",
+            "signals": 1973,
+            "net_pnl": -1480.854,
+            "signal_pnl": 154.07999999999993,
+            "spread_pnl": -1388.1,
+            "fees": 246.834,
+            "traded_shares": 82278,
+            "fill_rate": 0.23136428951046198
+          },
+          {
+            "symbol": "QQQ",
+            "signals": 2974,
+            "net_pnl": -4151.674,
+            "signal_pnl": 167.57000000000016,
+            "spread_pnl": -3578.67,
+            "fees": 740.574,
+            "traded_shares": 246858,
+            "fill_rate": 0.45612492077892564
+          },
+          {
+            "symbol": "IWM",
+            "signals": 2546,
+            "net_pnl": -7679.78,
+            "signal_pnl": 227.27999999999975,
+            "spread_pnl": -6695.87,
+            "fees": 1211.19,
+            "traded_shares": 403730,
+            "fill_rate": 0.7932481658604443
+          },
+          {
+            "symbol": "AAPL",
+            "signals": 2072,
+            "net_pnl": -236005.456,
+            "signal_pnl": -12011.595000000001,
+            "spread_pnl": -223163.845,
+            "fees": 830.016,
+            "traded_shares": 276672,
+            "fill_rate": 0.6959111397295557
+          },
+          {
+            "symbol": "MSFT",
+            "signals": 2042,
+            "net_pnl": -30991.112,
+            "signal_pnl": 1395.319999999996,
+            "spread_pnl": -32173.42,
+            "fees": 213.012,
+            "traded_shares": 71004,
+            "fill_rate": 0.21156258473200107
+          }
+        ],
+        "0.6": [
+          {
+            "symbol": "SPY",
+            "signals": 235,
+            "net_pnl": -488.216,
+            "signal_pnl": 115.52499999999998,
+            "spread_pnl": -537.675,
+            "fees": 66.066,
+            "traded_shares": 22022,
+            "fill_rate": 0.3104882484808324
+          },
+          {
+            "symbol": "QQQ",
+            "signals": 443,
+            "net_pnl": -1070.84,
+            "signal_pnl": 278.33500000000004,
+            "spread_pnl": -1179.375,
+            "fees": 169.8,
+            "traded_shares": 56600,
+            "fill_rate": 0.5243556724907821
+          },
+          {
+            "symbol": "IWM",
+            "signals": 94,
+            "net_pnl": -222.686,
+            "signal_pnl": 75.62499999999997,
+            "spread_pnl": -257.775,
+            "fees": 40.536,
+            "traded_shares": 13512,
+            "fill_rate": 0.6821141905194609
+          },
+          {
+            "symbol": "AAPL",
+            "signals": 1818,
+            "net_pnl": -215963.676,
+            "signal_pnl": -8945.140000000014,
+            "spread_pnl": -206303.81,
+            "fees": 714.726,
+            "traded_shares": 238242,
+            "fill_rate": 0.6910572878897752
+          },
+          {
+            "symbol": "MSFT",
+            "signals": 1037,
+            "net_pnl": -14553.744,
+            "signal_pnl": 3145.4050000000007,
+            "spread_pnl": -17607.235,
+            "fees": 91.914,
+            "traded_shares": 30638,
+            "fill_rate": 0.1972699761766789
+          }
+        ]
+      }
+    },
+    "30s": {
+      "class_share_dev": [
+        0.453957466430979,
+        0.09001493176403422,
+        0.45602760180498675
+      ],
+      "class_share_holdout": [
+        0.45681097045486985,
+        0.06804053534765758,
+        0.47514849419747257
+      ],
+      "walk_forward": {
+        "Majority class": {
+          "accuracy": 0.45076133224047565,
+          "balanced_accuracy": 0.3333333333333333,
+          "log_loss": 0.9443296942785532
+        },
+        "Imbalance rule": {
+          "accuracy": 0.3585376235078804,
+          "balanced_accuracy": 0.39659014309007723,
+          "log_loss": 0.9387242023637256
+        },
+        "Logistic regression": {
+          "accuracy": 0.49834057369463103,
+          "balanced_accuracy": 0.3680602092497795,
+          "log_loss": 0.9447576505446824
+        },
+        "LightGBM": {
+          "accuracy": 0.49676466200681235,
+          "balanced_accuracy": 0.3757177244236242,
+          "log_loss": 0.9192741854379379
+        }
+      },
+      "walk_forward_folds": {
+        "Majority class": [
+          {
+            "block": "20190730 pm",
+            "rows": 227405,
+            "accuracy": 0.45909720542644183,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 0.9506125253131693
+          },
+          {
+            "block": "20190830 am",
+            "rows": 228000,
+            "accuracy": 0.4535175438596491,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 0.8618590968310716
+          },
+          {
+            "block": "20190830 pm",
+            "rows": 227405,
+            "accuracy": 0.464906224577296,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 0.9151157413682803
+          },
+          {
+            "block": "20191030 am",
+            "rows": 228000,
+            "accuracy": 0.4360701754385965,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 1.0080658002342122
+          },
+          {
+            "block": "20191030 pm",
+            "rows": 227405,
+            "accuracy": 0.4511290428970339,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 0.9953118577148532
+          },
+          {
+            "block": "20191230 am",
+            "rows": 228000,
+            "accuracy": 0.474,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 0.9160652298165279
+          },
+          {
+            "block": "20191230 pm",
+            "rows": 227405,
+            "accuracy": 0.4166091334843121,
+            "balanced_accuracy": 0.3333333333333333,
+            "log_loss": 0.9632776086717576
+          }
+        ],
+        "Imbalance rule": [
+          {
+            "block": "20190730 pm",
+            "rows": 227405,
+            "accuracy": 0.3604670082012269,
+            "balanced_accuracy": 0.38198181690120814,
+            "log_loss": 0.9456457898427055
+          },
+          {
+            "block": "20190830 am",
+            "rows": 228000,
+            "accuracy": 0.2748464912280702,
+            "balanced_accuracy": 0.38063185395884624,
+            "log_loss": 0.8554710741367337
+          },
+          {
+            "block": "20190830 pm",
+            "rows": 227405,
+            "accuracy": 0.28988808513445175,
+            "balanced_accuracy": 0.36300769565577545,
+            "log_loss": 0.9109749189346167
+          },
+          {
+            "block": "20191030 am",
+            "rows": 228000,
+            "accuracy": 0.37115789473684213,
+            "balanced_accuracy": 0.4183182163316435,
+            "log_loss": 1.0030261969384138
+          },
+          {
+            "block": "20191030 pm",
+            "rows": 227405,
+            "accuracy": 0.3953123282249731,
+            "balanced_accuracy": 0.43233912120936563,
+            "log_loss": 0.9889934410587738
+          },
+          {
+            "block": "20191230 am",
+            "rows": 228000,
+            "accuracy": 0.41157894736842104,
+            "balanced_accuracy": 0.40669821798174527,
+            "log_loss": 0.909031370838139
+          },
+          {
+            "block": "20191230 pm",
+            "rows": 227405,
+            "accuracy": 0.4065126096611772,
+            "balanced_accuracy": 0.393154079591956,
+            "log_loss": 0.9579266247966962
+          }
+        ],
+        "Logistic regression": [
+          {
+            "block": "20190730 pm",
+            "rows": 227405,
+            "accuracy": 0.5115234933268837,
+            "balanced_accuracy": 0.37505553626968696,
+            "log_loss": 0.9302937506977655
+          },
+          {
+            "block": "20190830 am",
+            "rows": 228000,
+            "accuracy": 0.5044824561403509,
+            "balanced_accuracy": 0.35823958569056824,
+            "log_loss": 0.8551472470484153
+          },
+          {
+            "block": "20190830 pm",
+            "rows": 227405,
+            "accuracy": 0.4970251313735406,
+            "balanced_accuracy": 0.3593980838302988,
+            "log_loss": 0.9086920045122142
+          },
+          {
+            "block": "20191030 am",
+            "rows": 228000,
+            "accuracy": 0.47321052631578947,
+            "balanced_accuracy": 0.36174366382268847,
+            "log_loss": 1.0838299220401912
+          },
+          {
+            "block": "20191030 pm",
+            "rows": 227405,
+            "accuracy": 0.4831600008794881,
+            "balanced_accuracy": 0.37103079168907244,
+            "log_loss": 0.9717121627211533
+          },
+          {
+            "block": "20191230 am",
+            "rows": 228000,
+            "accuracy": 0.5215219298245614,
+            "balanced_accuracy": 0.37635055571988735,
+            "log_loss": 0.9032536345838663
+          },
+          {
+            "block": "20191230 pm",
+            "rows": 227405,
+            "accuracy": 0.49746047800180293,
+            "balanced_accuracy": 0.37460324772625403,
+            "log_loss": 0.9603748322091711
+          }
+        ],
+        "LightGBM": [
+          {
+            "block": "20190730 pm",
+            "rows": 227405,
+            "accuracy": 0.502165739539588,
+            "balanced_accuracy": 0.3682241769703158,
+            "log_loss": 0.9121514669077713
+          },
+          {
+            "block": "20190830 am",
+            "rows": 228000,
+            "accuracy": 0.5074166666666666,
+            "balanced_accuracy": 0.3609008147347798,
+            "log_loss": 0.8332819392099083
+          },
+          {
+            "block": "20190830 pm",
+            "rows": 227405,
+            "accuracy": 0.500301224687232,
+            "balanced_accuracy": 0.36207206920885476,
+            "log_loss": 0.8920417807382265
+          },
+          {
+            "block": "20191030 am",
+            "rows": 228000,
+            "accuracy": 0.4777587719298246,
+            "balanced_accuracy": 0.41605168600293396,
+            "log_loss": 0.9677464790947387
+          },
+          {
+            "block": "20191030 pm",
+            "rows": 227405,
+            "accuracy": 0.4812866911457532,
+            "balanced_accuracy": 0.37198079816493773,
+            "log_loss": 0.9507873265054139
+          },
+          {
+            "block": "20191230 am",
+            "rows": 228000,
+            "accuracy": 0.5183947368421052,
+            "balanced_accuracy": 0.38129504306829537,
+            "log_loss": 0.9176374563874045
+          },
+          {
+            "block": "20191230 pm",
+            "rows": 227405,
+            "accuracy": 0.4900288032365164,
+            "balanced_accuracy": 0.36949948281525263,
+            "log_loss": 0.9612728492221021
+          }
+        ]
+      },
+      "importance": {
+        "spread_ticks": 0.4158508290262109,
+        "imbalance_l5": 0.15868182288367064,
+        "trade_flow_20": 0.11018349235917939,
+        "imbalance_l1": 0.1089232960875348,
+        "volatility_5s": 0.08681189123337686,
+        "microprice_offset": 0.07471197254576319,
+        "return_1s": 0.0371203995530235,
+        "ofi_1s": 0.0058464646704147845,
+        "ofi_1": 0.001869831640825978
+      },
+      "holdout": {
+        "Majority class": {
+          "accuracy": 0.47514849419747257,
+          "balanced_accuracy": 0.3333333333333333,
+          "log_loss": 0.89768152140379
+        },
+        "Imbalance rule": {
+          "accuracy": 0.4158693909816537,
+          "balanced_accuracy": 0.41607741673623827,
+          "log_loss": 0.8920281041305392
+        },
+        "Logistic regression": {
+          "accuracy": 0.4942282144464817,
+          "balanced_accuracy": 0.3629632515103776,
+          "log_loss": 0.8880915786870154
+        },
+        "LightGBM": {
+          "accuracy": 0.4939647127282309,
+          "balanced_accuracy": 0.35514859602267707,
+          "log_loss": 0.8738729994202286
+        }
+      },
+      "backtest": {
+        "0.5": [
+          {
+            "symbol": "SPY",
+            "signals": 749,
+            "net_pnl": -530.016,
+            "signal_pnl": 0.39500000000003865,
+            "spread_pnl": -441.455,
+            "fees": 88.956,
+            "traded_shares": 29652,
+            "fill_rate": 0.22042818911685993
+          },
+          {
+            "symbol": "QQQ",
+            "signals": 753,
+            "net_pnl": -1099.472,
+            "signal_pnl": 27.32000000000005,
+            "spread_pnl": -923.92,
+            "fees": 202.872,
+            "traded_shares": 67624,
+            "fill_rate": 0.471470801494785
+          },
+          {
+            "symbol": "IWM",
+            "signals": 754,
+            "net_pnl": -1992.602,
+            "signal_pnl": 268.39499999999975,
+            "spread_pnl": -1907.675,
+            "fees": 353.322,
+            "traded_shares": 117774,
+            "fill_rate": 0.7724354139475703
+          },
+          {
+            "symbol": "AAPL",
+            "signals": 669,
+            "net_pnl": -83861.96,
+            "signal_pnl": -2837.1399999999994,
+            "spread_pnl": -80738.32,
+            "fees": 286.5,
+            "traded_shares": 95500,
+            "fill_rate": 0.7270042097730681
+          },
+          {
+            "symbol": "MSFT",
+            "signals": 712,
+            "net_pnl": -11099.576,
+            "signal_pnl": 1186.9700000000012,
+            "spread_pnl": -12202.0,
+            "fees": 84.546,
+            "traded_shares": 28182,
+            "fill_rate": 0.21220586574300668
+          }
+        ],
+        "0.6": [
+          {
+            "symbol": "SPY",
+            "signals": 150,
+            "net_pnl": -121.284,
+            "signal_pnl": 61.905,
+            "spread_pnl": -161.895,
+            "fees": 21.294,
+            "traded_shares": 7098,
+            "fill_rate": 0.21314675234977928
+          },
+          {
+            "symbol": "QQQ",
+            "signals": 139,
+            "net_pnl": -206.22,
+            "signal_pnl": 232.41000000000003,
+            "spread_pnl": -395.04,
+            "fees": 43.59,
+            "traded_shares": 14530,
+            "fill_rate": 0.5172843461853395
+          },
+          {
+            "symbol": "IWM",
+            "signals": 49,
+            "net_pnl": -110.382,
+            "signal_pnl": -16.66000000000001,
+            "spread_pnl": -79.22,
+            "fees": 14.502,
+            "traded_shares": 4834,
+            "fill_rate": 0.5972325179145046
+          },
+          {
+            "symbol": "AAPL",
+            "signals": 632,
+            "net_pnl": -69648.084,
+            "signal_pnl": -901.25,
+            "spread_pnl": -68480.53,
+            "fees": 266.304,
+            "traded_shares": 88768,
+            "fill_rate": 0.6775045412220848
+          },
+          {
+            "symbol": "MSFT",
+            "signals": 471,
+            "net_pnl": -6812.232,
+            "signal_pnl": 896.0950000000003,
+            "spread_pnl": -7662.055,
+            "fees": 46.272,
+            "traded_shares": 15424,
+            "fill_rate": 0.19301955974921473
+          }
+        ]
+      }
+    }
+  }
+}
