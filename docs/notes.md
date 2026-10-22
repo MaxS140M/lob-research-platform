@@ -66,7 +66,7 @@ The idea: the shape of the book right now says a little about which way the pric
 4. **Model:** LightGBM, gradient-boosted trees. It's fast and strong on tabular data, and it shows which features it actually uses.
 5. **Backtest:** trade only on confident predictions, and pay the spread, fees and a latency delay. The question is whether the signal survives costs, not just whether it predicts.
 
-## Pitfalls to avoid
+## What im gonna try an avoid
 
 - **Splitting data randomly.** Neighbouring snapshots are almost identical, so a random split leaks the future into training. Always split by time: train on earlier days, test on later ones.
 - **Lookahead:** every feature may only use information available at that exact moment.
